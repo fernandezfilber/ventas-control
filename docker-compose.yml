@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  ventas-app:
+    build: .
+    container_name: ventas-app
+    restart: unless-stopped
+    environment:
+      # Conexión a la base de datos MySQL central. Ajustar la IP, red o nombre del contenedor.
+      # Si están en la misma red de docker, usar mysql_central en lugar de localhost
+      - DATABASE_URL=mysql://root:rootpassword@mysql_central:3306/ventas_control
+      - REDIS_URL=redis://redis_central:6379
+    networks:
+      - proxy
+      - database_network # Red donde está tu mysql_central
+    labels:
+      - "traefik.enable=true"
+      # Subdominio para la aplicación / API
+      - "traefik.http.routers.ventas.rule=Host(`ventas.forwardvision.cloud`)"
+      - "traefik.http.routers.ventas.entrypoints=websecure"
+      - "traefik.http.routers.ventas.tls.certresolver=myresolver" # Ajusta al certresolver que uses en traefik
+      - "traefik.http.services.ventas.loadbalancer.server.port=3000"
+
+networks:
+  proxy:
+    external: true
+  database_network:
+    external: true

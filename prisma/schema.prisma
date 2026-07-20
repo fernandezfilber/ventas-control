@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   @default("TECHNICIAN")
+  createdAt DateTime @default(now())
+}
+
+model Sale {
+  id               Int        @id @default(autoincrement())
+  correlativeId    String     @unique // "001", "002", etc.
+  dni              String
+  names            String
+  address          String
+  phone            String
+  locationLink     String
+  referencePhotos  String
+  status           String     @default("PENDING")
+  sellerNameOrId   String     
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Attendance {
+  id           Int      @id @default(autoincrement())
+  userId       Int?
+  userName     String
+  photoUrl     String
+  latitude     Float
+  longitude    Float
+  createdAt    DateTime @default(now())
+}
+
