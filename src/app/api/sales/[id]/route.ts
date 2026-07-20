@@ -3,10 +3,11 @@ import prisma from "@/lib/prisma";
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const resolvedParams = await params;
+    const id = parseInt(resolvedParams.id, 10);
     const data = await req.json();
 
     if (isNaN(id)) {
