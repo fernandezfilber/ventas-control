@@ -15,7 +15,11 @@ export default function NuevaVenta() {
     address: "",
     phone: "",
     locationLink: "",
-    referencePhotos: ""
+    referencePhotos: "",
+    installationDate: "",
+    installationTimeRange: "",
+    internetPlan: "",
+    details: ""
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,6 +120,31 @@ export default function NuevaVenta() {
           <div className="form-group">
             <label>Dirección</label>
             <input type="text" name="address" required onChange={handleChange} />
+          </div>
+
+          <div className="form-group">
+            <label>Fecha de Instalación Sugerida</label>
+            <input type="date" name="installationDate" required onChange={handleChange} />
+          </div>
+
+          <div className="form-group">
+            <label>Rango de Horario</label>
+            <select name="installationTimeRange" onChange={handleChange} required style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid var(--border-color)' }}>
+              <option value="">Seleccione un rango...</option>
+              <option value="08:00 AM - 11:00 AM">08:00 AM - 11:00 AM</option>
+              <option value="11:00 AM - 02:00 PM">11:00 AM - 02:00 PM</option>
+              <option value="02:00 PM - 05:00 PM">02:00 PM - 05:00 PM</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Plan de Internet</label>
+            <input type="text" name="internetPlan" placeholder="Ej: 100 Mbps Fibra" onChange={handleChange} required />
+          </div>
+
+          <div className="form-group">
+            <label>Detalles adicionales (Opcional)</label>
+            <textarea name="details" placeholder="Ej: Cliente tiene 3 TVs, requiere cable extra..." onChange={handleChange} style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid var(--border-color)', minHeight: '80px', fontFamily: 'inherit' }}></textarea>
           </div>
 
           <div className="form-group">

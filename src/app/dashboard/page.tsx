@@ -12,6 +12,10 @@ type Sale = {
   phone: string;
   locationLink: string;
   referencePhotos: string;
+  installationDate: string | null;
+  installationTimeRange: string | null;
+  internetPlan: string | null;
+  details: string | null;
   status: string;
   sellerNameOrId: string;
   installedAt: string | null;
@@ -156,8 +160,9 @@ export default function DashboardVentas() {
             <tr style={{ background: 'var(--bg-light)', textAlign: 'left' }}>
               <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>ID</th>
               <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>ID Cliente</th>
-              <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Fecha</th>
+              <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Fecha Registro</th>
               <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Cliente</th>
+              <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Instalación Sugerida</th>
               <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Vendedor</th>
               <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Ubicación</th>
               <th style={{ padding: '12px', borderBottom: '2px solid var(--border-color)' }}>Estado</th>
@@ -192,6 +197,12 @@ export default function DashboardVentas() {
                       <div>{s.names}</div>
                       <div style={{ fontSize: '0.8rem', color: '#666' }}>DNI: {s.dni} | Cel: {s.phone}</div>
                       <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.address}</div>
+                      {s.internetPlan && <div style={{ fontSize: '0.8rem', color: '#0050b3', marginTop: '4px', fontWeight: 500 }}>Plan: {s.internetPlan}</div>}
+                      {s.details && <div style={{ fontSize: '0.8rem', color: '#d46b08', marginTop: '2px' }}>Info: {s.details}</div>}
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <div style={{ fontWeight: 500, color: '#333' }}>{s.installationDate || 'No definida'}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#666' }}>{s.installationTimeRange || '—'}</div>
                     </td>
                     <td style={{ padding: '12px' }}>{s.sellerNameOrId}</td>
                     <td style={{ padding: '12px' }}>

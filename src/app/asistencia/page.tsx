@@ -200,7 +200,7 @@ export default function Asistencia() {
                 type="text"
                 value={registerName}
                 onChange={(e) => setRegisterName(e.target.value)}
-                placeholder="Ej: Doris María"
+                placeholder="Ej: Filber Fernandez"
                 autoFocus
               />
             </div>

@@ -33,6 +33,10 @@ model Sale {
   phone            String
   locationLink     String     @db.Text
   referencePhotos  String     @db.LongText
+  installationDate String?
+  installationTimeRange String?
+  internetPlan     String?
+  details          String?    @db.Text
   status           String     @default("PENDING")
   sellerNameOrId   String
   installedAt      DateTime?
