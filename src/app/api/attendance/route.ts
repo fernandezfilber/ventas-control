@@ -11,6 +11,35 @@ export async function POST(req: Request) {
       if (!employee || employee.status !== 'APPROVED') {
         return NextResponse.json({ message: 'Empleado no aprobado' }, { status: 403 });
       }
+
+      // Check for existing attendances in the same shift (morning/afternoon)
+      const now = new Date();
+      // Ajustamos a zona horaria local de Perú (UTC-5) restando 5 horas si el servidor está en UTC
+      // Pero para simplificar y asumiendo que el server tiene la hora correcta configurada:
+      const currentHour = now.getHours();
+      const isMorning = currentHour < 13; // Antes de la 1 PM es mañana, desde 1 PM es tarde
+
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const todayAttendances = await prisma.attendance.findMany({
+        where: {
+          dni: data.dni,
+          createdAt: { gte: startOfDay, lte: endOfDay }
+        }
+      });
+
+      const morningAttendances = todayAttendances.filter(a => new Date(a.createdAt).getHours() < 13);
+      const afternoonAttendances = todayAttendances.filter(a => new Date(a.createdAt).getHours() >= 13);
+
+      if (isMorning && morningAttendances.length > 0) {
+        return NextResponse.json({ message: 'Ya registraste tu asistencia esta mañana.' }, { status: 400 });
+      }
+      if (!isMorning && afternoonAttendances.length > 0) {
+        return NextResponse.json({ message: 'Ya registraste tu asistencia esta tarde.' }, { status: 400 });
+      }
     }
 
     const newAttendance = await prisma.attendance.create({
