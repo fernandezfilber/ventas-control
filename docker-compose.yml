@@ -10,6 +10,7 @@ services:
       # Si están en la misma red de docker, usar mysql_central en lugar de localhost
       - DATABASE_URL=mysql://root:MySecureRootPass123!@mysql_central:3306/ventas_control
       - REDIS_URL=redis://:MySecureRedisPass123!@redis_central:6379
+      - JWT_SECRET=ventas-control-jwt-secret-prod-2024
     networks:
       - shared-infra
     labels:

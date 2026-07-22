@@ -15,28 +15,38 @@ model User {
   createdAt DateTime @default(now())
 }
 
+model Employee {
+  id        Int      @id @default(autoincrement())
+  name      String
+  dni       String   @unique
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+}
+
 model Sale {
   id               Int        @id @default(autoincrement())
-  correlativeId    String     @unique // "001", "002", etc.
+  correlativeId    String     @unique
+  clientId         String?
   dni              String
   names            String
   address          String
   phone            String
-  locationLink     String
-  referencePhotos  String
+  locationLink     String     @db.Text
+  referencePhotos  String     @db.LongText
   status           String     @default("PENDING")
-  sellerNameOrId   String     
+  sellerNameOrId   String
+  installedAt      DateTime?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 }
 
 model Attendance {
   id           Int      @id @default(autoincrement())
-  userId       Int?
+  employeeId   Int?
   userName     String
-  photoUrl     String
+  dni          String?
+  photoUrl     String   @db.LongText
   latitude     Float
   longitude    Float
   createdAt    DateTime @default(now())
 }
-

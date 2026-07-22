@@ -21,8 +21,8 @@ export default function Home() {
         </div>
 
         <div style={{ marginTop: '30px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
-          <Link href="/dashboard" style={{ color: 'var(--text-light)', fontSize: '0.9rem', textDecoration: 'none' }}>
-            Acceso Administrativo / Técnico
+          <Link href="/login" style={{ color: 'var(--text-light)', fontSize: '0.9rem', textDecoration: 'none' }}>
+            🔐 Acceso Administrativo
           </Link>
         </div>
       </div>

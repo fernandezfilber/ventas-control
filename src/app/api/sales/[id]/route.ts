@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
 export async function PUT(
   req: Request,
@@ -11,19 +11,23 @@ export async function PUT(
     const data = await req.json();
 
     if (isNaN(id)) {
-      return NextResponse.json({ message: "ID inválido" }, { status: 400 });
+      return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
     }
+
+    const updateData: Record<string, unknown> = {};
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.clientId !== undefined) updateData.clientId = data.clientId;
+    if (data.status === 'INSTALLED') updateData.installedAt = new Date();
+    if (data.status === 'PENDING') updateData.installedAt = null;
 
     const updatedSale = await prisma.sale.update({
       where: { id },
-      data: {
-        status: data.status,
-      },
+      data: updateData,
     });
 
     return NextResponse.json(updatedSale);
   } catch (error) {
-    console.error("Error updating sale:", error);
-    return NextResponse.json({ message: "Error al actualizar venta" }, { status: 500 });
+    console.error('Error updating sale:', error);
+    return NextResponse.json({ message: 'Error al actualizar venta' }, { status: 500 });
   }
 }

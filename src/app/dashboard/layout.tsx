@@ -1,6 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } catch {
+      alert("Error al cerrar sesión");
+    }
+  };
+
   return (
     <div className="main-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       <aside className="sidebar">
@@ -17,6 +32,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 👥 Control Asistencia
               </Link>
             </li>
+            <li>
+              <Link href="/dashboard/empleados" style={{ textDecoration: 'none', color: '#333', fontWeight: 500, display: 'block', padding: '8px', background: '#fff', borderRadius: '4px' }}>
+                🏢 Gestión Empleados
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -25,10 +45,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <p style={{ fontSize: '0.8rem', color: '#666' }}>Mostrando datos en tiempo real.</p>
         </div>
         
-        <div style={{ marginTop: 'auto' }}>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
             <button className="btn-primary" style={{ backgroundColor: '#6c757d' }}>← Volver al Portal</button>
           </Link>
+          <button onClick={handleLogout} className="btn-primary" style={{ backgroundColor: '#dc3545' }}>
+            🚪 Cerrar Sesión
+          </button>
         </div>
       </aside>
       

@@ -9,6 +9,7 @@ export default function NuevaVenta() {
   const [locationStr, setLocationStr] = useState("");
   const [formData, setFormData] = useState({
     sellerId: "",
+    clientId: "",
     dni: "",
     names: "",
     address: "",
@@ -95,6 +96,11 @@ export default function NuevaVenta() {
           <div className="form-group">
             <label>ID o Nombre del Vendedor</label>
             <input type="text" name="sellerId" required onChange={handleChange} placeholder="Ej: Juan Perez o 1234" />
+          </div>
+
+          <div className="form-group">
+            <label>ID de Cliente (código de caja) - Opcional</label>
+            <input type="text" name="clientId" onChange={handleChange} placeholder="Ej: 10293" />
           </div>
 
           <div className="form-group">
