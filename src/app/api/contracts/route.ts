@@ -21,6 +21,9 @@ async function getAuthUser() {
 export async function GET(req: Request) {
   const auth = await getAuthUser();
   if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  if (!['ADMIN', 'SELLER', 'CLIENT'].includes(auth.role)) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
@@ -30,7 +33,10 @@ export async function GET(req: Request) {
 
   // Sellers only see their contracts
   if (auth.role === 'SELLER') {
-    where.sellerUserId = auth.userId;
+    where.OR = [
+      { sellerUserId: auth.userId },
+      { sale: { sellerUserId: auth.userId } },
+    ];
   }
   // Clients only see their own contract
   if (auth.role === 'CLIENT') {

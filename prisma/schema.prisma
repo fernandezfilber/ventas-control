@@ -15,10 +15,13 @@ model User {
   fullName  String?
   phone     String?
   sellerId  Int?
+  whatsappRemindersEnabled Boolean @default(false)
   createdAt DateTime @default(now())
 
   clientContracts Contract[] @relation("ClientContracts")
   sellerContracts Contract[] @relation("SellerContracts")
+  sales           Sale[]     @relation("SellerSales")
+  clientSales     Sale[]     @relation("ClientSales")
 }
 
 model Employee {
@@ -33,6 +36,10 @@ model Sale {
   id                    Int       @id @default(autoincrement())
   correlativeId         String    @unique
   clientId              String?
+  sellerUserId          Int?
+  sellerUser            User?     @relation("SellerSales", fields: [sellerUserId], references: [id])
+  clientUserId           Int?
+  clientUser             User?     @relation("ClientSales", fields: [clientUserId], references: [id])
   dni                   String
   names                 String
   address               String
@@ -64,6 +71,7 @@ model Contract {
   startDate       DateTime
   endDate         DateTime
   monthlyAmount   Float     @default(0)
+  reminderMode    String    @default("MANUAL")
   status          String    @default("PENDING_SIGNATURE")
   clientSignedAt  DateTime?
   sellerSignedAt  DateTime?
@@ -85,6 +93,7 @@ model Receipt {
   paidAt      DateTime?
   amount      Float
   status      String   @default("PENDING")
+  lastReminderAt DateTime?
   createdAt   DateTime @default(now())
 }
 

@@ -1,10 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
+
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+
+  try {
+    const { payload } = await jwtVerify(token, SECRET);
+    if (payload.role !== 'ADMIN') return NextResponse.json({ message: 'Solo un administrador puede actualizar ventas' }, { status: 403 });
+  } catch {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  }
+
   try {
     const resolvedParams = await params;
     const id = parseInt(resolvedParams.id, 10);
@@ -46,8 +61,8 @@ export async function PUT(
           data: {
             contractNumber,
             saleId: id,
-            clientUserId: data.clientUserId || null,
-            sellerUserId: data.sellerUserId || null,
+            clientUserId: updatedSale.clientUserId || (await prisma.user.findFirst({ where: { username: updatedSale.dni, role: 'CLIENT' } }))?.id || null,
+            sellerUserId: updatedSale.sellerUserId,
             startDate,
             endDate,
             monthlyAmount,

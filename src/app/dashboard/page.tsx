@@ -112,6 +112,12 @@ export default function DashboardVentas() {
     return created.getTime() < today.getTime();
   }).length;
 
+  // Group sales by seller
+  const salesBySeller = sales.reduce((acc, sale) => {
+    acc[sale.sellerNameOrId] = (acc[sale.sellerNameOrId] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   return (
     <div>
       <h2 style={{ marginBottom: '20px', color: 'var(--primary-color)' }}>Panel de Ventas (Instalaciones)</h2>
@@ -130,6 +136,20 @@ export default function DashboardVentas() {
           <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ad6800' }}>{overdue}</div>
           <div style={{ fontSize: '0.85rem', color: '#ad6800' }}>⚠️ Vencidas</div>
         </div>
+      </div>
+
+      {/* Sales by Seller */}
+      <h3 style={{ marginBottom: '16px', color: 'var(--fv-navy)', fontSize: '1.2rem' }}>Rendimiento por Asesor</h3>
+      <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {Object.entries(salesBySeller).sort((a, b) => b[1] - a[1]).map(([seller, count]) => (
+          <div key={seller} className="card" style={{ flex: '1 1 200px', background: '#fff', borderLeft: '4px solid var(--fv-blue)', padding: '15px' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--fv-navy)' }}>{count}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: 600 }}>{seller}</div>
+          </div>
+        ))}
+        {Object.keys(salesBySeller).length === 0 && (
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>No hay ventas registradas aún.</div>
+        )}
       </div>
 
       {/* Filters */}

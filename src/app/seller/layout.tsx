@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiPieChart, FiUsers, FiLogOut } from "react-icons/fi";
+import { FiPieChart, FiUsers, FiLogOut, FiLock } from "react-icons/fi";
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,6 +21,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
   const navItems = [
     { href: "/seller", label: "Métricas", icon: <FiPieChart className="nav-icon" /> },
     { href: "/seller/clientes", label: "Mis Clientes", icon: <FiUsers className="nav-icon" /> },
+    { href: "/perfil", label: "Contraseña", icon: <FiLock className="nav-icon" /> },
   ];
 
   return (

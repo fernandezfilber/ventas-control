@@ -30,6 +30,15 @@ export async function PUT(
   const { id } = await params;
   const receiptId = parseInt(id, 10);
 
+  const receiptToPay = await prisma.receipt.findUnique({
+    where: { id: receiptId },
+    include: { contract: { include: { sale: true } } },
+  });
+  if (!receiptToPay) return NextResponse.json({ message: 'Recibo no encontrado' }, { status: 404 });
+  if (auth.role === 'SELLER' && receiptToPay.contract.sellerUserId !== auth.userId && receiptToPay.contract.sale.sellerUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
+
   const receipt = await prisma.receipt.update({
     where: { id: receiptId },
     data: { status: 'PAID', paidAt: new Date() },

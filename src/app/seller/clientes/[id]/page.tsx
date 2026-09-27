@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink } from "react-icons/fi";
+import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink, FiMessageCircle } from "react-icons/fi";
 
 interface Receipt {
   id: number;
@@ -17,10 +17,17 @@ interface Contract {
   id: number;
   contractNumber: string;
   status: string;
+  reminderMode: string;
   monthlyAmount: number;
   sale: { names: string; dni: string; address: string; phone: string; internetPlan: string; locationLink: string };
-  clientUser: { id: number; username: string } | null;
+  clientUser: { id: number; username: string; whatsappRemindersEnabled: boolean } | null;
   receipts: Receipt[];
+}
+
+interface ClientUserOption {
+  id: number;
+  username: string;
+  fullName: string | null;
 }
 
 export default function SellerClientDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -29,29 +36,44 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<ClientUserOption[]>([]);
   const [linking, setLinking] = useState(false);
+  const [reminderMode, setReminderMode] = useState("MANUAL");
+  const [savingReminderMode, setSavingReminderMode] = useState(false);
 
   useEffect(() => {
-    fetchContract();
-    fetchUsers();
+    let active = true;
+    fetch(`/api/contracts/${id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active) return;
+        setContract(data);
+        if (data) setReminderMode(data.reminderMode || "MANUAL");
+        setLoading(false);
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
+    fetch("/api/users?role=CLIENT")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (active) setUsers(data);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [id]);
 
-  const fetchContract = () => {
+  const refreshContract = () => {
     fetch(`/api/contracts/${id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setContract(data);
+        if (data) setReminderMode(data.reminderMode || "MANUAL");
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  };
-
-  const fetchUsers = () => {
-    fetch("/api/users?role=CLIENT")
-      .then((res) => res.json())
-      .then((data) => setUsers(data))
-      .catch(() => {});
   };
 
   const handleMarkPaid = async (receiptId: number) => {
@@ -60,7 +82,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     try {
       const res = await fetch(`/api/receipts/${receiptId}/pay`, { method: "PUT" });
       if (res.ok) {
-        fetchContract(); // Reload data
+        refreshContract();
       } else {
         alert("Error al procesar el pago");
       }
@@ -81,13 +103,35 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         body: JSON.stringify({ clientUserId: parseInt(userId, 10) })
       });
       if (res.ok) {
-        fetchContract();
+        refreshContract();
         alert("Cuenta vinculada exitosamente al contrato.");
       }
     } catch {
       alert("Error de red");
     } finally {
       setLinking(false);
+    }
+  };
+
+  const handleReminderModeChange = async (mode: string) => {
+    if (mode === "AUTOMATIC" && !contract?.clientUser?.whatsappRemindersEnabled) return;
+    setSavingReminderMode(true);
+    try {
+      const res = await fetch(`/api/contracts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reminderMode: mode }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.message || "No se pudo guardar el modo de recordatorio.");
+        return;
+      }
+      setReminderMode(mode);
+    } catch {
+      alert("Error de conexión.");
+    } finally {
+      setSavingReminderMode(false);
     }
   };
 
@@ -161,6 +205,26 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      <section className="card" style={{ marginBottom: "20px" }}>
+        <h3 style={{ color: "var(--fv-navy)", marginBottom: "8px" }}>Recordatorios de pago por WhatsApp</h3>
+        <select
+          value={reminderMode}
+          disabled={savingReminderMode || !contract.clientUser}
+          onChange={(event) => handleReminderModeChange(event.target.value)}
+          style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)" }}
+        >
+          <option value="MANUAL">Manual: el asesor envía cada aviso</option>
+          <option value="AUTOMATIC" disabled={!contract.clientUser?.whatsappRemindersEnabled}>Automático: enviar cerca del vencimiento</option>
+        </select>
+        <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--text-light)" }}>
+          {!contract.clientUser
+            ? "Vincula una cuenta de cliente para configurar avisos automáticos."
+            : contract.clientUser.whatsappRemindersEnabled
+              ? "El cliente autorizó los avisos. El modo automático requiere configurar WhatsApp Business y el cron del servidor."
+              : "El cliente aún no autorizó avisos automáticos; puede hacerlo desde su portal."}
+        </p>
+      </section>
+
       {/* Recibos */}
       <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--fv-navy)", marginBottom: "16px" }}>Historial de Recibos</h3>
       
@@ -168,6 +232,10 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         {contract.receipts.map((r) => {
           const isPaid = r.status === "PAID";
           const isOverdue = r.status === "OVERDUE" || (!isPaid && new Date(r.dueDate) < new Date());
+          const phoneDigits = contract.sale.phone.replace(/\D/g, "");
+          const whatsappPhone = phoneDigits.length === 9 ? `51${phoneDigits}` : phoneDigits;
+          const reminderMessage = `Hola ${contract.sale.names}, te recordamos el pago de S/ ${r.amount.toFixed(2)} correspondiente al mes ${r.monthNumber}, con vencimiento el ${new Date(r.dueDate).toLocaleDateString("es-PE")}.`;
+          const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(reminderMessage)}`;
           
           let statusColor = "var(--fv-blue)";
           let statusIcon = <FiClock size={20} color={statusColor} />;
@@ -199,9 +267,14 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                   {statusText}
                 </div>
                 {!isPaid ? (
-                  <button onClick={() => handleMarkPaid(r.id)} className="btn-success" style={{ padding: "6px 12px", fontSize: "0.75rem", borderRadius: "6px" }}>
-                    Marcar Pagado
-                  </button>
+                  <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                    <a href={whatsappUrl} target="_blank" rel="noreferrer" aria-label={`Enviar recordatorio WhatsApp a ${contract.sale.names}`} style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#15803d", border: "1px solid #86efac", borderRadius: "6px", padding: "6px 9px", fontSize: "0.75rem", textDecoration: "none" }}>
+                      <FiMessageCircle /> WhatsApp
+                    </a>
+                    <button onClick={() => handleMarkPaid(r.id)} className="btn-success" style={{ padding: "6px 12px", fontSize: "0.75rem", borderRadius: "6px" }}>
+                      Marcar Pagado
+                    </button>
+                  </div>
                 ) : (
                   <div style={{ fontSize: "0.75rem", color: "var(--text-light)" }}>
                     {new Date(r.paidAt!).toLocaleDateString()}

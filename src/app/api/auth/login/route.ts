@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-secret-key-2024');
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
 export async function POST(req: Request) {
   try {

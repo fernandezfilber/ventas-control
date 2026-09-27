@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
+interface AuthUser {
+  username: string;
+  fullName: string | null;
+  role: string;
+}
 
 export default function NuevaVenta() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [locationStr, setLocationStr] = useState("");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+
   const [formData, setFormData] = useState({
     sellerId: "",
     clientId: "",
@@ -21,6 +29,21 @@ export default function NuevaVenta() {
     internetPlan: "",
     details: ""
   });
+
+  useEffect(() => {
+    fetch("/api/users/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setCurrentUser(data);
+          setFormData((prev) => ({
+            ...prev,
+            sellerId: data.fullName || data.username,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,7 +60,7 @@ export default function NuevaVenta() {
           setLocationStr(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
           setLoading(false);
         },
-        (error) => {
+        () => {
           alert("Error al obtener ubicación. Asegúrese de dar permisos.");
           setLoading(false);
         }
@@ -76,12 +99,12 @@ export default function NuevaVenta() {
       
       if (res.ok) {
         alert("Venta registrada exitosamente");
-        router.push("/");
+        router.push(currentUser?.role === "ADMIN" ? "/dashboard" : "/seller");
       } else {
         const errorData = await res.json();
         alert(`Error: ${errorData.message}`);
       }
-    } catch (error) {
+    } catch {
       alert("Error de red");
     } finally {
       setLoading(false);
@@ -98,8 +121,17 @@ export default function NuevaVenta() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>ID o Nombre del Vendedor</label>
-            <input type="text" name="sellerId" required onChange={handleChange} placeholder="Ej: Juan Perez o 1234" />
+            <label>Nombre del Vendedor</label>
+            <input
+              type="text"
+              name="sellerId"
+              required
+              value={formData.sellerId}
+              onChange={handleChange}
+              placeholder="Ej: Juan Perez o 1234"
+              readOnly={currentUser?.role === 'SELLER'}
+              style={{ background: currentUser?.role === 'SELLER' ? '#f1f5f9' : '#fff' }}
+            />
           </div>
 
           <div className="form-group">

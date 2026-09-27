@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FiFileText, FiClock, FiAlertCircle } from "react-icons/fi";
+import { FiClock, FiAlertCircle } from "react-icons/fi";
+
+interface ReceiptSummary {
+  id: number;
+  status: string;
+  amount: number;
+  monthNumber: number;
+  dueDate: string;
+}
 
 interface Contract {
   id: number;
@@ -11,12 +19,14 @@ interface Contract {
   paymentDay: number;
   monthlyAmount: number;
   sale: { internetPlan: string; address: string };
-  receipts: any[];
+  receipts: ReceiptSummary[];
 }
 
 export default function ClientDashboard() {
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
+  const [whatsappConsent, setWhatsappConsent] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
 
   useEffect(() => {
     fetch("/api/contracts")
@@ -27,6 +37,30 @@ export default function ClientDashboard() {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetch("/api/users/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => setWhatsappConsent(Boolean(user?.whatsappRemindersEnabled)))
+      .catch(() => {});
+  }, []);
+
+  const updateWhatsappConsent = async (enabled: boolean) => {
+    setSavingConsent(true);
+    try {
+      const res = await fetch("/api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ whatsappRemindersEnabled: enabled }),
+      });
+      if (res.ok) setWhatsappConsent(enabled);
+      else alert("No se pudo guardar tu preferencia.");
+    } catch {
+      alert("Error de conexión.");
+    } finally {
+      setSavingConsent(false);
+    }
+  };
 
   if (loading) {
     return <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>;
@@ -51,6 +85,19 @@ export default function ClientDashboard() {
   return (
     <div>
       <h2 style={{ marginBottom: "20px", fontSize: "1.5rem", fontWeight: 700 }}>Resumen de tu Servicio</h2>
+
+      <section className="client-card" style={{ marginBottom: "18px" }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", lineHeight: 1.45 }}>
+          <input
+            type="checkbox"
+            checked={whatsappConsent}
+            disabled={savingConsent}
+            onChange={(event) => updateWhatsappConsent(event.target.checked)}
+            style={{ marginTop: "3px" }}
+          />
+          <span>Acepto recibir recordatorios de pago por WhatsApp. Puedo cambiar esta preferencia cuando quiera.</span>
+        </label>
+      </section>
 
       <div className="client-card premium">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>

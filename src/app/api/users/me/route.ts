@@ -23,9 +23,28 @@ export async function GET() {
 
   const user = await prisma.user.findUnique({
     where: { id: auth.userId },
-    select: { id: true, username: true, role: true, fullName: true, phone: true, sellerId: true, createdAt: true },
+    select: { id: true, username: true, role: true, fullName: true, phone: true, sellerId: true, whatsappRemindersEnabled: true, createdAt: true },
   });
 
   if (!user) return NextResponse.json({ message: 'Usuario no encontrado' }, { status: 404 });
+  return NextResponse.json(user);
+}
+
+export async function PATCH(req: Request) {
+  const auth = await getAuthUser();
+  if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  if (auth.role !== 'CLIENT') return NextResponse.json({ message: 'Solo el cliente puede gestionar este consentimiento' }, { status: 403 });
+
+  const { whatsappRemindersEnabled } = await req.json();
+  if (typeof whatsappRemindersEnabled !== 'boolean') {
+    return NextResponse.json({ message: 'Consentimiento inválido' }, { status: 400 });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: auth.userId },
+    data: { whatsappRemindersEnabled },
+    select: { id: true, whatsappRemindersEnabled: true },
+  });
+
   return NextResponse.json(user);
 }

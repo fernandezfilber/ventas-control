@@ -34,6 +34,9 @@ export default async function proxy(request: NextRequest) {
     if (pathname.startsWith('/client') && role !== 'CLIENT' && role !== 'ADMIN') {
       return NextResponse.redirect(new URL(ROLE_HOME[role] || '/login', request.url));
     }
+    if (pathname.startsWith('/ventas') && role !== 'SELLER' && role !== 'ADMIN') {
+      return NextResponse.redirect(new URL(ROLE_HOME[role] || '/login', request.url));
+    }
 
     return NextResponse.next();
   } catch {
@@ -44,5 +47,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/seller/:path*', '/client/:path*'],
+  matcher: ['/dashboard/:path*', '/seller/:path*', '/client/:path*', '/ventas/:path*', '/perfil/:path*'],
 };

@@ -31,8 +31,15 @@ export async function POST(
 
   if (!signature) return NextResponse.json({ message: 'Firma requerida' }, { status: 400 });
 
-  const contract = await prisma.contract.findUnique({ where: { id: contractId } });
+  const contract = await prisma.contract.findUnique({ where: { id: contractId }, include: { sale: true } });
   if (!contract) return NextResponse.json({ message: 'Contrato no encontrado' }, { status: 404 });
+
+  if (auth.role === 'SELLER' && contract.sellerUserId !== auth.userId && contract.sale.sellerUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
+  if (auth.role !== 'ADMIN' && auth.role !== 'SELLER' && auth.role !== 'CLIENT') {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
 
   const updateData: Record<string, unknown> = {};
   const now = new Date();

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiBarChart2, FiUsers, FiFileText, FiUserCheck, FiLogOut, FiArrowLeft } from "react-icons/fi";
+import { FiBarChart2, FiUsers, FiFileText, FiUserCheck, FiLogOut, FiArrowLeft, FiLock } from "react-icons/fi";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -46,6 +46,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         <Link href="/" className="sidebar-item">
           <FiArrowLeft className="icon" /> Volver al Portal
+        </Link>
+
+        <Link href="/perfil" className="sidebar-item">
+          <FiLock className="icon" /> Cambiar Contraseña
         </Link>
         
         <button onClick={handleLogout} className="sidebar-item" style={{ color: "var(--fv-red)" }}>

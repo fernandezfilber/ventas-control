@@ -1,9 +1,44 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { jwtVerify } from 'jose';
+import { cookies } from 'next/headers';
+
+const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
+
+async function getAuthUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get('auth-token')?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, SECRET);
+    return payload as { userId: number; username: string; role: string };
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
+  const auth = await getAuthUser();
+  if (!auth || !['ADMIN', 'SELLER'].includes(auth.role)) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: auth ? 403 : 401 });
+  }
+
   try {
     const data = await req.json();
+    const user = await prisma.user.findUnique({ where: { id: auth.userId } });
+    if (!user) return NextResponse.json({ message: 'Usuario no encontrado' }, { status: 401 });
+
+    const seller = auth.role === 'SELLER'
+      ? user
+      : data.sellerId
+        ? await prisma.user.findFirst({
+            where: { role: 'SELLER', OR: [{ username: data.sellerId }, { fullName: data.sellerId }] },
+          })
+        : user;
+      if (auth.role === 'ADMIN' && data.sellerId && !seller) {
+        return NextResponse.json({ message: 'No se encontró un asesor con ese usuario o nombre' }, { status: 400 });
+      }
+      if (!seller) return NextResponse.json({ message: 'Selecciona un asesor para esta venta' }, { status: 400 });
 
     const lastSale = await prisma.sale.findFirst({
       orderBy: { id: 'desc' },
@@ -19,6 +54,7 @@ export async function POST(req: Request) {
       data: {
         correlativeId,
         clientId: data.clientId || null,
+        sellerUserId: seller.id,
         dni: data.dni,
         names: data.names,
         address: data.address,
@@ -29,7 +65,7 @@ export async function POST(req: Request) {
         installationTimeRange: data.installationTimeRange || null,
         internetPlan: data.internetPlan || null,
         details: data.details || null,
-        sellerNameOrId: data.sellerId,
+        sellerNameOrId: seller.fullName || seller.username,
         status: 'PENDING',
       },
     });
@@ -42,6 +78,11 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  const auth = await getAuthUser();
+  if (!auth || !['ADMIN', 'SELLER'].includes(auth.role)) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: auth ? 403 : 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const dni = searchParams.get('dni');
@@ -49,6 +90,15 @@ export async function GET(req: Request) {
     const status = searchParams.get('status');
 
     const where: Record<string, unknown> = {};
+
+    if (auth.role === 'SELLER') {
+      const user = await prisma.user.findUnique({ where: { id: auth.userId } });
+      where.OR = [
+        { sellerUserId: auth.userId },
+        { sellerNameOrId: auth.username },
+        ...(user?.fullName ? [{ sellerNameOrId: user.fullName }] : []),
+      ];
+    }
 
     if (dni) {
       where.dni = { contains: dni };

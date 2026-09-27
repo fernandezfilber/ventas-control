@@ -22,6 +22,9 @@ async function getAuthUser() {
 export async function GET(req: Request) {
   const auth = await getAuthUser();
   if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  if (auth.role !== 'ADMIN' && auth.role !== 'SELLER') {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const role = searchParams.get('role');
@@ -57,6 +60,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Faltan campos requeridos' }, { status: 400 });
     }
 
+    if (auth.role === 'SELLER' && role !== 'CLIENT') {
+      return NextResponse.json({ message: 'Los asesores solo pueden crear cuentas de clientes' }, { status: 403 });
+    }
+    if (auth.role === 'ADMIN' && !['ADMIN', 'SELLER', 'CLIENT', 'TECHNICIAN'].includes(role)) {
+      return NextResponse.json({ message: 'Rol inválido' }, { status: 400 });
+    }
+
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) {
       return NextResponse.json({ message: 'El usuario ya existe' }, { status: 409 });
@@ -71,10 +81,20 @@ export async function POST(req: Request) {
         role,
         fullName: fullName || null,
         phone: phone || null,
-        sellerId: sellerId || (auth.role === 'SELLER' ? auth.userId : null),
+        sellerId: auth.role === 'SELLER' ? auth.userId : (sellerId || null),
       },
       select: { id: true, username: true, role: true, fullName: true, phone: true, createdAt: true },
     });
+
+    if (role === 'CLIENT') {
+      const ownerId = auth.role === 'SELLER' ? auth.userId : (sellerId || undefined);
+      const saleWhere = { dni: username, ...(ownerId ? { sellerUserId: ownerId } : {}) };
+      await prisma.sale.updateMany({ where: saleWhere, data: { clientUserId: user.id } });
+      await prisma.contract.updateMany({
+        where: { sale: saleWhere },
+        data: { clientUserId: user.id },
+      });
+    }
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

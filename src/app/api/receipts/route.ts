@@ -21,6 +21,9 @@ async function getAuthUser() {
 export async function GET(req: Request) {
   const auth = await getAuthUser();
   if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  if (!['ADMIN', 'SELLER', 'CLIENT'].includes(auth.role)) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const contractId = searchParams.get('contractId');
@@ -35,6 +38,13 @@ export async function GET(req: Request) {
       select: { id: true },
     });
     where.contractId = { in: clientContracts.map((c) => c.id) };
+  }
+  if (auth.role === 'SELLER') {
+    const sellerContracts = await prisma.contract.findMany({
+      where: { OR: [{ sellerUserId: auth.userId }, { sale: { sellerUserId: auth.userId } }] },
+      select: { id: true },
+    });
+    where.contractId = { in: sellerContracts.map((contract) => contract.id) };
   }
 
   const receipts = await prisma.receipt.findMany({

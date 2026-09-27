@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiHome, FiFileText, FiCreditCard, FiLogOut } from "react-icons/fi";
+import { FiHome, FiFileText, FiCreditCard, FiLogOut, FiLock } from "react-icons/fi";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -22,6 +22,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { href: "/client", label: "Inicio", icon: <FiHome className="nav-icon" /> },
     { href: "/client/contrato", label: "Contrato", icon: <FiFileText className="nav-icon" /> },
     { href: "/client/pagos", label: "Pagos", icon: <FiCreditCard className="nav-icon" /> },
+    { href: "/perfil", label: "Contraseña", icon: <FiLock className="nav-icon" /> },
   ];
 
   return (
