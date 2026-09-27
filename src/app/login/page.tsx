@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const ROLE_ROUTES: Record<string, string> = {
+  ADMIN: "/dashboard",
+  SELLER: "/seller",
+  CLIENT: "/client",
+  TECHNICIAN: "/",
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -23,7 +30,9 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
+        const data = await res.json();
+        const route = ROLE_ROUTES[data.user?.role] || "/dashboard";
+        router.push(route);
         router.refresh();
       } else {
         const data = await res.json();
@@ -37,65 +46,166 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="main-layout" style={{ justifyContent: 'center', alignItems: 'center', background: 'var(--bg-light)' }}>
-      <div className="card" style={{ maxWidth: '400px', width: '90%', padding: '40px 30px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🔐</div>
-          <h1 style={{ color: 'var(--primary-color)', fontSize: '1.5rem', marginBottom: '5px' }}>Acceso Administrativo</h1>
-          <p style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>Ingrese sus credenciales</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(160deg, #0a0f1e 0%, #0f1b3d 50%, #071428 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        fontFamily: "var(--font-family)",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          background: "rgba(255,255,255,.07)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255,255,255,.12)",
+          borderRadius: "24px",
+          padding: "40px 32px",
+          boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+        }}
+      >
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          <div
+            style={{
+              width: "64px",
+              height: "64px",
+              background: "linear-gradient(135deg, #06b6d4, #10b981)",
+              borderRadius: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+              fontSize: "1.6rem",
+              fontWeight: 900,
+              color: "#fff",
+              boxShadow: "0 8px 24px rgba(6,182,212,.4)",
+            }}
+          >
+            FV
+          </div>
+          <h1 style={{ color: "#f8fafc", fontSize: "1.5rem", fontWeight: 800, marginBottom: "6px" }}>
+            ForwardVision
+          </h1>
+          <p style={{ color: "#94a3b8", fontSize: ".875rem" }}>Ingresa tus credenciales para continuar</p>
         </div>
 
         {error && (
-          <div style={{
-            background: 'var(--accent-red)',
-            color: '#c00',
-            padding: '10px 15px',
-            borderRadius: '5px',
-            marginBottom: '20px',
-            fontSize: '0.9rem',
-            border: '1px solid #ffa39e'
-          }}>
+          <div
+            style={{
+              background: "rgba(239,68,68,.15)",
+              border: "1px solid rgba(239,68,68,.3)",
+              color: "#fca5a5",
+              padding: "12px 16px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+              fontSize: ".875rem",
+              display: "flex",
+              gap: "8px",
+              alignItems: "center",
+            }}
+          >
             ⚠️ {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Usuario</label>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", marginBottom: "8px", color: "#cbd5e1", fontWeight: 600, fontSize: ".85rem" }}>
+              Usuario
+            </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="Tu usuario"
               required
               autoFocus
+              style={{
+                width: "100%",
+                padding: "13px 16px",
+                background: "rgba(255,255,255,.08)",
+                border: "1.5px solid rgba(255,255,255,.12)",
+                borderRadius: "12px",
+                color: "#f8fafc",
+                fontSize: ".9rem",
+                fontFamily: "inherit",
+                outline: "none",
+                transition: "border-color .2s",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(6,182,212,.6)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,.12)")}
             />
           </div>
 
-          <div className="form-group">
-            <label>Contraseña</label>
+          <div style={{ marginBottom: "24px" }}>
+            <label style={{ display: "block", marginBottom: "8px", color: "#cbd5e1", fontWeight: 600, fontSize: ".85rem" }}>
+              Contraseña
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              style={{
+                width: "100%",
+                padding: "13px 16px",
+                background: "rgba(255,255,255,.08)",
+                border: "1.5px solid rgba(255,255,255,.12)",
+                borderRadius: "12px",
+                color: "#f8fafc",
+                fontSize: ".9rem",
+                fontFamily: "inherit",
+                outline: "none",
+                transition: "border-color .2s",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(6,182,212,.6)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,.12)")}
             />
           </div>
 
           <button
             type="submit"
-            className="btn-primary"
             disabled={loading}
-            style={{ padding: '12px', fontSize: '1rem', marginTop: '10px' }}
+            style={{
+              width: "100%",
+              padding: "14px",
+              background: loading ? "#374151" : "linear-gradient(135deg, #1e40af, #06b6d4)",
+              border: "none",
+              borderRadius: "12px",
+              color: "#fff",
+              fontSize: "1rem",
+              fontWeight: 700,
+              fontFamily: "inherit",
+              cursor: loading ? "not-allowed" : "pointer",
+              transition: "opacity .2s, transform .1s",
+              boxShadow: "0 4px 16px rgba(30,64,175,.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
           >
-            {loading ? "Ingresando..." : "Iniciar Sesión"}
+            {loading ? (
+              <>
+                <div className="spinner" />
+                Ingresando...
+              </>
+            ) : (
+              "Iniciar Sesión →"
+            )}
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <a href="/" style={{ color: 'var(--text-light)', fontSize: '0.85rem', textDecoration: 'none' }}>
-            ← Volver al Portal
+        <div style={{ textAlign: "center", marginTop: "24px" }}>
+          <a href="/" style={{ color: "#64748b", fontSize: ".8rem", textDecoration: "none" }}>
+            ← Volver al Portal de Trabajadores
           </a>
         </div>
       </div>

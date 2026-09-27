@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -12,7 +12,13 @@ model User {
   username  String   @unique
   password  String
   role      String   @default("TECHNICIAN")
+  fullName  String?
+  phone     String?
+  sellerId  Int?
   createdAt DateTime @default(now())
+
+  clientContracts Contract[] @relation("ClientContracts")
+  sellerContracts Contract[] @relation("SellerContracts")
 }
 
 model Employee {
@@ -24,33 +30,71 @@ model Employee {
 }
 
 model Sale {
-  id               Int        @id @default(autoincrement())
-  correlativeId    String     @unique
-  clientId         String?
-  dni              String
-  names            String
-  address          String
-  phone            String
-  locationLink     String     @db.Text
-  referencePhotos  String     @db.LongText
-  installationDate String?
+  id                    Int       @id @default(autoincrement())
+  correlativeId         String    @unique
+  clientId              String?
+  dni                   String
+  names                 String
+  address               String
+  phone                 String
+  locationLink          String
+  referencePhotos       String
+  installationDate      String?
   installationTimeRange String?
-  internetPlan     String?
-  details          String?    @db.Text
-  status           String     @default("PENDING")
-  sellerNameOrId   String
-  installedAt      DateTime?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  internetPlan          String?
+  details               String?
+  status                String    @default("PENDING")
+  sellerNameOrId        String
+  installedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  contract Contract?
+}
+
+model Contract {
+  id              Int       @id @default(autoincrement())
+  contractNumber  String    @unique
+  saleId          Int       @unique
+  sale            Sale      @relation(fields: [saleId], references: [id])
+  clientUserId    Int?
+  clientUser      User?     @relation("ClientContracts", fields: [clientUserId], references: [id])
+  sellerUserId    Int?
+  sellerUser      User?     @relation("SellerContracts", fields: [sellerUserId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  monthlyAmount   Float     @default(0)
+  status          String    @default("PENDING_SIGNATURE")
+  clientSignedAt  DateTime?
+  sellerSignedAt  DateTime?
+  clientSignature String?
+  sellerSignature String?
+  paymentDay      Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  receipts Receipt[]
+}
+
+model Receipt {
+  id          Int      @id @default(autoincrement())
+  contractId  Int
+  contract    Contract @relation(fields: [contractId], references: [id])
+  monthNumber Int
+  dueDate     DateTime
+  paidAt      DateTime?
+  amount      Float
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
 }
 
 model Attendance {
-  id           Int      @id @default(autoincrement())
-  employeeId   Int?
-  userName     String
-  dni          String?
-  photoUrl     String   @db.LongText
-  latitude     Float
-  longitude    Float
-  createdAt    DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  employeeId Int?
+  userName   String
+  dni        String?
+  photoUrl   String
+  latitude   Float
+  longitude  Float
+  createdAt  DateTime @default(now())
 }

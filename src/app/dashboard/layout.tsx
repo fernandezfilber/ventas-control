@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { FiBarChart2, FiUsers, FiFileText, FiUserCheck, FiLogOut, FiArrowLeft } from "react-icons/fi";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = async () => {
     try {
@@ -16,48 +18,58 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  return (
-    <div className="main-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-      <aside className="sidebar">
-        <div className="card" style={{ background: '#e6f7ff', borderLeft: '4px solid #1890ff' }}>
-          <h4 style={{ marginBottom: '10px', color: '#0050b3' }}>Menú Principal</h4>
-          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <li>
-              <Link href="/dashboard" style={{ textDecoration: 'none', color: '#333', fontWeight: 500, display: 'block', padding: '8px', background: '#fff', borderRadius: '4px' }}>
-                📊 Resumen Ventas
-              </Link>
-            </li>
-            <li>
-              <Link href="/dashboard/asistencia" style={{ textDecoration: 'none', color: '#333', fontWeight: 500, display: 'block', padding: '8px', background: '#fff', borderRadius: '4px' }}>
-                👥 Control Asistencia
-              </Link>
-            </li>
-            <li>
-              <Link href="/dashboard/empleados" style={{ textDecoration: 'none', color: '#333', fontWeight: 500, display: 'block', padding: '8px', background: '#fff', borderRadius: '4px' }}>
-                🏢 Gestión Empleados
-              </Link>
-            </li>
-          </ul>
-        </div>
+  const navItems = [
+    { href: "/dashboard", label: "Panel Principal", icon: <FiBarChart2 className="nav-icon" /> },
+    { href: "/dashboard/contratos", label: "Contratos", icon: <FiFileText className="nav-icon" /> },
+    { href: "/dashboard/usuarios", label: "Usuarios / Asesores", icon: <FiUsers className="nav-icon" /> },
+    { href: "/dashboard/asistencia", label: "Control Asistencia", icon: <FiUserCheck className="nav-icon" /> },
+    { href: "/dashboard/empleados", label: "Gestión Empleados", icon: <FiUsers className="nav-icon" /> },
+  ];
 
-        <div className="card" style={{ background: '#fff7e6', borderLeft: '4px solid #faad14' }}>
-          <h4 style={{ marginBottom: '5px', color: '#ad6800', fontSize: '0.9rem' }}>Estado Actual</h4>
-          <p style={{ fontSize: '0.8rem', color: '#666' }}>Mostrando datos en tiempo real.</p>
-        </div>
+  return (
+    <div className="main-layout">
+      <aside className="sidebar">
+        <div className="sidebar-section-label">Administración FV</div>
         
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <button className="btn-primary" style={{ backgroundColor: '#6c757d' }}>← Volver al Portal</button>
+        {navItems.map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`sidebar-item ${pathname === item.href ? "active" : ""}`}
+          >
+            {item.icon}
+            {item.label}
           </Link>
-          <button onClick={handleLogout} className="btn-primary" style={{ backgroundColor: '#dc3545' }}>
-            🚪 Cerrar Sesión
-          </button>
-        </div>
+        ))}
+
+        <div className="sidebar-divider" style={{ marginTop: "auto" }}></div>
+        
+        <Link href="/" className="sidebar-item">
+          <FiArrowLeft className="icon" /> Volver al Portal
+        </Link>
+        
+        <button onClick={handleLogout} className="sidebar-item" style={{ color: "var(--fv-red)" }}>
+          <FiLogOut className="icon" /> Cerrar Sesión
+        </button>
       </aside>
       
-      <main className="content-area" style={{ flex: 1, padding: '20px', overflowY: 'auto' }}>
+      <main className="content-area">
         {children}
       </main>
+
+      {/* Mobile Nav for Admin */}
+      <nav className="bottom-nav mobile-only">
+        {navItems.slice(0,4).map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`bottom-nav-item ${pathname === item.href ? "active" : ""}`}
+          >
+            {item.icon}
+            <span>{item.label.split(" ")[0]}</span>
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }
