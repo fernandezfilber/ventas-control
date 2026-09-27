@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -37,12 +37,12 @@ model Sale {
   names                 String
   address               String
   phone                 String
-  locationLink          String
-  referencePhotos       String
+  locationLink          String    @db.Text
+  referencePhotos       String    @db.LongText
   installationDate      String?
   installationTimeRange String?
   internetPlan          String?
-  details               String?
+  details               String?   @db.Text
   status                String    @default("PENDING")
   sellerNameOrId        String
   installedAt           DateTime?
@@ -67,8 +67,8 @@ model Contract {
   status          String    @default("PENDING_SIGNATURE")
   clientSignedAt  DateTime?
   sellerSignedAt  DateTime?
-  clientSignature String?
-  sellerSignature String?
+  clientSignature String?   @db.LongText
+  sellerSignature String?   @db.LongText
   paymentDay      Int
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -93,7 +93,7 @@ model Attendance {
   employeeId Int?
   userName   String
   dni        String?
-  photoUrl   String
+  photoUrl   String   @db.LongText
   latitude   Float
   longitude  Float
   createdAt  DateTime @default(now())
