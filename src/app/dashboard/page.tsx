@@ -68,13 +68,21 @@ export default function DashboardVentas() {
   const handleMarkInstalled = async (sale: Sale) => {
     const clientId = prompt('Ingrese el ID de Cliente (código de caja):', sale.clientId || '');
     if (clientId === null) return; // cancelled
+    const amountInput = prompt('Ingrese el monto mensual del contrato (S/):', '');
+    if (amountInput === null) return;
+    const monthlyAmount = Number(amountInput.replace(',', '.'));
+    if (!Number.isFinite(monthlyAmount) || monthlyAmount <= 0) {
+      alert('Ingrese un monto mensual válido mayor que cero.');
+      return;
+    }
 
     try {
-      await fetch(`/api/sales/${sale.id}`, {
+      const res = await fetch(`/api/sales/${sale.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'INSTALLED', clientId: clientId || null }),
+        body: JSON.stringify({ status: 'INSTALLED', clientId: clientId || null, monthlyAmount }),
       });
+      if (!res.ok) throw new Error('Error al confirmar la instalación');
       fetchSales();
     } catch (e) {
       console.error(e);

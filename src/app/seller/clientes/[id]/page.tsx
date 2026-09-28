@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink, FiMessageCircle } from "react-icons/fi";
+import jsPDF from "jspdf";
+import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink, FiMessageCircle, FiDownload, FiCheck, FiX } from "react-icons/fi";
 
 interface Receipt {
   id: number;
@@ -16,9 +17,13 @@ interface Receipt {
 interface Contract {
   id: number;
   contractNumber: string;
+  startDate: string;
+  endDate: string;
   status: string;
   reminderMode: string;
   monthlyAmount: number;
+  sellerSignature: string | null;
+  clientSignature: string | null;
   sale: { id: number; names: string; dni: string; address: string; phone: string; internetPlan: string; locationLink: string; details: string | null };
   clientUser: { id: number; username: string; whatsappRemindersEnabled: boolean } | null;
   receipts: Receipt[];
@@ -44,6 +49,9 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   const [editingClient, setEditingClient] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
   const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", details: "" });
+  const [signing, setSigning] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -136,6 +144,107 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     }
   };
 
+  const getCanvasPoint = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const bounds = canvas.getBoundingClientRect();
+    const point = "touches" in event ? event.touches[0] : event;
+    return {
+      x: (point.clientX - bounds.left) * (canvas.width / bounds.width),
+      y: (point.clientY - bounds.top) * (canvas.height / bounds.height),
+    };
+  };
+
+  const startDrawing = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const point = getCanvasPoint(event);
+    const context = canvasRef.current?.getContext("2d");
+    if (!point || !context) return;
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+    setIsDrawing(true);
+  };
+
+  const drawSignature = (event: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const point = getCanvasPoint(event);
+    const context = canvasRef.current?.getContext("2d");
+    if (!point || !context) return;
+    context.lineWidth = 2;
+    context.lineCap = "round";
+    context.lineTo(point.x, point.y);
+    context.stroke();
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const handleSellerSign = async () => {
+    if (!contract || !canvasRef.current) return;
+    const signature = canvasRef.current.toDataURL("image/png");
+    if (signature.length < 1500) {
+      alert("Dibuja tu firma antes de guardarla.");
+      return;
+    }
+    setSigning(true);
+    try {
+      const res = await fetch(`/api/contracts/${contract.id}/sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signature, signerRole: "SELLER" }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.message || "No se pudo guardar la firma.");
+        return;
+      }
+      setContract(await res.json());
+    } catch {
+      alert("Error de conexión.");
+    } finally {
+      setSigning(false);
+      setIsDrawing(false);
+    }
+  };
+
+  const downloadContractPdf = () => {
+    if (!contract) return;
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.setTextColor(30, 64, 175);
+    doc.text("ForwardVision", 105, 20, { align: "center" });
+    doc.setFontSize(13);
+    doc.setTextColor(0, 0, 0);
+    doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS", 105, 30, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(`Contrato N°: ${contract.contractNumber}`, 20, 45);
+    doc.text(`Inicio: ${new Date(contract.startDate).toLocaleDateString("es-PE")}`, 20, 52);
+    doc.text(`Vencimiento: ${new Date(contract.endDate).toLocaleDateString("es-PE")}`, 20, 59);
+    doc.setFontSize(12);
+    doc.text("DATOS DEL CLIENTE", 20, 75);
+    doc.setFontSize(10);
+    doc.text(doc.splitTextToSize(`Nombre: ${contract.sale.names}`, 170), 20, 84);
+    doc.text(`DNI: ${contract.sale.dni}`, 20, 92);
+    doc.text(doc.splitTextToSize(`Dirección: ${contract.sale.address}`, 170), 20, 99);
+    doc.text(`Teléfono: ${contract.sale.phone}`, 20, 107);
+    doc.text(`Plan: ${contract.sale.internetPlan}`, 20, 114);
+    doc.text(`Monto mensual: S/ ${contract.monthlyAmount.toFixed(2)}`, 20, 121);
+    doc.setFontSize(12);
+    doc.text("CONDICIONES DEL SERVICIO", 20, 140);
+    doc.setFontSize(10);
+    const terms = "El cliente se compromete a mantener el servicio por un periodo mínimo de 3 meses. El pago deberá realizarse según el cronograma acordado. En caso de incumplimiento, ForwardVision podrá suspender el servicio.";
+    doc.text(doc.splitTextToSize(terms, 170), 20, 148);
+    doc.setFontSize(12);
+    doc.text("FIRMAS", 20, 190);
+    doc.setFontSize(10);
+    doc.text("ASESOR", 55, 226, { align: "center" });
+    doc.text("CLIENTE", 155, 226, { align: "center" });
+    if (contract.sellerSignature) doc.addImage(contract.sellerSignature, "PNG", 30, 196, 50, 24);
+    if (contract.clientSignature) doc.addImage(contract.clientSignature, "PNG", 130, 196, 50, 24);
+    doc.save(`Contrato_${contract.contractNumber}.pdf`);
+  };
+
   const handleLinkUser = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const userId = e.target.value;
     if (!userId) return;
@@ -188,6 +297,13 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       <button onClick={() => router.back()} style={{ background: "none", border: "none", color: "var(--text-light)", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", padding: "0 0 20px 0", fontSize: "0.9rem", fontWeight: 600 }}>
         <FiArrowLeft /> Volver a lista
       </button>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+        <h2 style={{ color: "var(--fv-navy)", fontSize: "1.2rem" }}>Contrato {contract.contractNumber}</h2>
+        <button onClick={downloadContractPdf} className="btn-primary" style={{ width: "auto", padding: "8px 12px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <FiDownload /> Descargar PDF
+        </button>
+      </div>
 
       {/* Perfil del Cliente */}
       <div className="card" style={{ padding: "0", overflow: "hidden", marginBottom: "20px" }}>
@@ -299,6 +415,39 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
           </section>
         </div>
       </div>
+
+      <section className="card" style={{ marginBottom: "20px" }}>
+        <h3 style={{ color: "var(--fv-navy)", marginBottom: "12px" }}>Firmas del contrato</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "16px", fontSize: "0.9rem" }}>
+          <span>{contract.sellerSignature ? "✓ Asesor firmó" : "Asesor pendiente de firma"}</span>
+          <span>{contract.clientSignature ? "✓ Cliente firmó" : "Cliente pendiente de firma"}</span>
+        </div>
+        {!contract.sellerSignature && (
+          <>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-light)", marginBottom: "10px" }}>Firma en el recuadro. El cliente deberá firmar desde su propio acceso.</p>
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={220}
+              aria-label="Recuadro para la firma del asesor"
+              style={{ display: "block", width: "100%", height: "140px", background: "#fff", border: "1px solid var(--border-color)", borderRadius: "8px", touchAction: "none" }}
+              onMouseDown={startDrawing}
+              onMouseMove={drawSignature}
+              onMouseUp={() => setIsDrawing(false)}
+              onMouseLeave={() => setIsDrawing(false)}
+              onTouchStart={startDrawing}
+              onTouchMove={drawSignature}
+              onTouchEnd={() => setIsDrawing(false)}
+            />
+            <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+              <button onClick={clearSignature} className="btn-outline" style={{ width: "auto", padding: "8px 12px" }}><FiX /> Borrar</button>
+              <button onClick={handleSellerSign} className="btn-primary" disabled={signing} style={{ width: "auto", padding: "8px 12px" }}>
+                <FiCheck /> {signing ? "Guardando..." : "Firmar como asesor"}
+              </button>
+            </div>
+          </>
+        )}
+      </section>
 
       <section className="card" style={{ marginBottom: "20px" }}>
         <h3 style={{ color: "var(--fv-navy)", marginBottom: "8px" }}>Recordatorios de pago por WhatsApp</h3>

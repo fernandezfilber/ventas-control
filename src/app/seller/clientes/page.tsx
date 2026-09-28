@@ -8,12 +8,22 @@ interface Contract {
   id: number;
   contractNumber: string;
   status: string;
-  sale: { names: string; dni: string; internetPlan: string };
+  sale: { id: number; names: string; dni: string; internetPlan: string | null };
   clientUser: { username: string } | null;
+}
+
+interface Sale {
+  id: number;
+  correlativeId: string;
+  names: string;
+  dni: string;
+  internetPlan: string | null;
+  status: string;
 }
 
 export default function SellerClients() {
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   
@@ -23,10 +33,12 @@ export default function SellerClients() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    fetch("/api/contracts")
-      .then((res) => res.json())
-      .then((data) => {
-        setContracts(data);
+    Promise.all([fetch("/api/contracts"), fetch("/api/sales")])
+      .then(async ([contractsRes, salesRes]) => {
+        if (!contractsRes.ok || !salesRes.ok) throw new Error("No se pudieron cargar los clientes");
+        const [contractData, saleData] = await Promise.all([contractsRes.json(), salesRes.json()]);
+        setContracts(contractData);
+        setSales(saleData);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -70,6 +82,15 @@ export default function SellerClients() {
     c.sale.dni.includes(search) ||
     c.contractNumber.toLowerCase().includes(search.toLowerCase())
   );
+  const contractedSaleIds = new Set(contracts.map((contract) => contract.sale.id));
+  const pendingSales = sales.filter((sale) =>
+    !contractedSaleIds.has(sale.id) && (
+      sale.names.toLowerCase().includes(search.toLowerCase()) ||
+      sale.dni.includes(search) ||
+      sale.correlativeId.toLowerCase().includes(search.toLowerCase())
+    )
+  );
+  const visibleCount = filtered.length + pendingSales.length;
 
   return (
     <div>
@@ -98,7 +119,7 @@ export default function SellerClients() {
 
       {loading ? (
          <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" style={{ borderTopColor: "var(--fv-blue)" }} /></div>
-      ) : filtered.length === 0 ? (
+      ) : visibleCount === 0 ? (
         <div className="card" style={{ textAlign: "center", color: "var(--text-light)" }}>No se encontraron clientes.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -121,6 +142,19 @@ export default function SellerClients() {
                 <FiChevronRight color="#cbd5e1" />
               </div>
             </Link>
+          ))}
+          {pendingSales.map((sale) => (
+            <div key={`sale-${sale.id}`} className="card" style={{ padding: "16px", display: "flex", alignItems: "center", gap: "12px", margin: 0 }}>
+              <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "#fff7ed", color: "#c2410c", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.9rem" }}>
+                {sale.names.substring(0, 2).toUpperCase()}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: "var(--fv-navy)" }}>{sale.names}</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-light)" }}>DNI: {sale.dni} · Venta {sale.correlativeId} · {sale.internetPlan || "Sin plan"}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-light)", marginTop: "4px" }}>El contrato y las opciones de firma aparecerán cuando administración confirme la instalación.</div>
+              </div>
+              <span className="badge badge-pending">{sale.status === "INSTALLED" ? "Instalación confirmada" : "Pendiente de instalación"}</span>
+            </div>
           ))}
         </div>
       )}

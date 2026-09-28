@@ -29,7 +29,9 @@ export async function POST(
   const contractId = parseInt(id, 10);
   const { signature, signerRole } = await req.json();
 
-  if (!signature) return NextResponse.json({ message: 'Firma requerida' }, { status: 400 });
+  if (typeof signature !== 'string' || !signature.startsWith('data:image/')) {
+    return NextResponse.json({ message: 'Firma inválida' }, { status: 400 });
+  }
 
   const contract = await prisma.contract.findUnique({ where: { id: contractId }, include: { sale: true } });
   if (!contract) return NextResponse.json({ message: 'Contrato no encontrado' }, { status: 404 });
@@ -44,23 +46,24 @@ export async function POST(
   const updateData: Record<string, unknown> = {};
   const now = new Date();
 
-  if (signerRole === 'CLIENT' || auth.role === 'CLIENT') {
+  if (auth.role === 'CLIENT') {
     if (auth.role === 'CLIENT' && contract.clientUserId !== auth.userId) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
     }
     updateData.clientSignature = signature;
     updateData.clientSignedAt = now;
-  } else if (signerRole === 'SELLER' || auth.role === 'SELLER') {
+  } else if (auth.role === 'SELLER') {
     updateData.sellerSignature = signature;
     updateData.sellerSignedAt = now;
   } else if (auth.role === 'ADMIN') {
-    // Admin can sign for either party
     if (signerRole === 'CLIENT') {
       updateData.clientSignature = signature;
       updateData.clientSignedAt = now;
-    } else {
+    } else if (signerRole === 'SELLER') {
       updateData.sellerSignature = signature;
       updateData.sellerSignedAt = now;
+    } else {
+      return NextResponse.json({ message: 'Indica quién firma el contrato' }, { status: 400 });
     }
   }
 

@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const contracts = await prisma.contract.findMany({
     where,
     include: {
-      sale: { select: { names: true, dni: true, phone: true, address: true, internetPlan: true, correlativeId: true } },
+      sale: { select: { id: true, names: true, dni: true, phone: true, address: true, internetPlan: true, correlativeId: true } },
       clientUser: { select: { id: true, username: true, fullName: true, phone: true } },
       sellerUser: { select: { id: true, username: true, fullName: true } },
       receipts: true,
