@@ -75,9 +75,14 @@ export default function SellerClients() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--fv-navy)" }}>Mis Clientes</h2>
-        <button onClick={() => setShowModal(true)} className="btn-primary" style={{ width: "auto", padding: "8px 12px", display: "flex", alignItems: "center", gap: "6px", borderRadius: "8px" }}>
-          <FiUserPlus /> Nuevo Acceso
-        </button>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <Link href="/ventas/nueva" className="btn-primary" style={{ width: "auto", padding: "8px 12px", display: "flex", alignItems: "center", gap: "6px", borderRadius: "8px", textDecoration: "none" }}>
+            <FiUserPlus /> Registrar cliente
+          </Link>
+          <button onClick={() => setShowModal(true)} className="btn-primary" style={{ width: "auto", padding: "8px 12px", display: "flex", alignItems: "center", gap: "6px", borderRadius: "8px" }}>
+            <FiUserPlus /> Nuevo acceso
+          </button>
+        </div>
       </div>
 
       <div style={{ position: "relative", marginBottom: "20px" }}>

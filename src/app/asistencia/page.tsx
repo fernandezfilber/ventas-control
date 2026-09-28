@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type EmployeeCheckResult = {
   status: string;
@@ -10,11 +10,12 @@ type EmployeeCheckResult = {
 };
 
 export default function Asistencia() {
-  const router = useRouter();
   const [step, setStep] = useState<'dni' | 'register' | 'pending' | 'blocked' | 'capture' | 'done'>('dni');
   const [dniInput, setDniInput] = useState("");
   const [employeeName, setEmployeeName] = useState("");
   const [registerName, setRegisterName] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState("");
   const [locationStr, setLocationStr] = useState("");
@@ -30,7 +31,7 @@ export default function Asistencia() {
   };
 
   useEffect(() => {
-    return () => { stopCamera(); };
+    return () => { streamRef?.getTracks().forEach(track => track.stop()); };
   }, [streamRef]);
 
   const startCamera = async () => {
@@ -82,12 +83,20 @@ export default function Asistencia() {
       alert("Ingrese su nombre");
       return;
     }
+    if (registerPassword.length < 8) {
+      alert("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+    if (registerPassword !== confirmPassword) {
+      alert("Las contraseñas no coinciden");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: registerName.trim(), dni: dniInput.trim() }),
+        body: JSON.stringify({ name: registerName.trim(), dni: dniInput.trim(), password: registerPassword }),
       });
       if (res.ok || res.status === 409) {
         setStep('pending');
@@ -189,7 +198,7 @@ export default function Asistencia() {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📝</div>
             <h2 style={{ marginBottom: '5px', color: 'var(--primary-color)' }}>Registro de Empleado</h2>
-            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '25px' }}>No estás registrado. Completa tus datos para solicitar acceso.</p>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '25px' }}>Regístrate como asesor. Al aprobar tu solicitud, podrás ingresar con tu DNI y la contraseña elegida.</p>
             <div className="form-group" style={{ textAlign: 'left' }}>
               <label>DNI</label>
               <input type="text" value={dniInput} disabled style={{ background: '#f5f5f5' }} />
@@ -202,6 +211,28 @@ export default function Asistencia() {
                 onChange={(e) => setRegisterName(e.target.value)}
                 placeholder="Ej: Filber Fernandez"
                 autoFocus
+              />
+            </div>
+            <div className="form-group" style={{ textAlign: 'left' }}>
+              <label>Contraseña (mínimo 8 caracteres)</label>
+              <input
+                type="password"
+                value={registerPassword}
+                onChange={(e) => setRegisterPassword(e.target.value)}
+                minLength={8}
+                autoComplete="new-password"
+                required
+              />
+            </div>
+            <div className="form-group" style={{ textAlign: 'left' }}>
+              <label>Confirmar Contraseña</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={8}
+                autoComplete="new-password"
+                required
               />
             </div>
             <button className="btn-primary" onClick={handleRegister} disabled={loading} style={{ padding: '12px', fontSize: '1rem' }}>
@@ -225,7 +256,7 @@ export default function Asistencia() {
               <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '10px' }}>El administrador debe aprobar tu cuenta antes de que puedas marcar asistencia.</p>
             </div>
             <div style={{ marginTop: '20px' }}>
-              <a href="/" style={{ color: 'var(--text-light)', fontSize: '0.85rem', textDecoration: 'none' }}>← Volver al Portal</a>
+              <Link href="/" style={{ color: 'var(--text-light)', fontSize: '0.85rem', textDecoration: 'none' }}>← Volver al Portal</Link>
             </div>
           </div>
         )}
@@ -240,7 +271,7 @@ export default function Asistencia() {
               <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '10px' }}>Contacta con tu supervisor para más información.</p>
             </div>
             <div style={{ marginTop: '20px' }}>
-              <a href="/" style={{ color: 'var(--text-light)', fontSize: '0.85rem', textDecoration: 'none' }}>← Volver al Portal</a>
+              <Link href="/" style={{ color: 'var(--text-light)', fontSize: '0.85rem', textDecoration: 'none' }}>← Volver al Portal</Link>
             </div>
           </div>
         )}
@@ -280,7 +311,7 @@ export default function Asistencia() {
               {locationStr && <p style={{ color: '#666', fontSize: '0.85rem', marginTop: '5px' }}>📍 Ubicación: {locationStr}</p>}
             </div>
             <div style={{ marginTop: '20px' }}>
-              <a href="/" style={{ color: 'var(--primary-color)', fontWeight: 500, textDecoration: 'none' }}>← Volver al Portal</a>
+              <Link href="/" style={{ color: 'var(--primary-color)', fontWeight: 500, textDecoration: 'none' }}>← Volver al Portal</Link>
             </div>
           </div>
         )}

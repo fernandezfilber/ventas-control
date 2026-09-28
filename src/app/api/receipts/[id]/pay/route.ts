@@ -23,7 +23,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthUser();
-  if (!auth || (auth.role !== 'ADMIN' && auth.role !== 'SELLER')) {
+  if (!auth || auth.role !== 'ADMIN') {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
   }
 
@@ -35,10 +35,6 @@ export async function PUT(
     include: { contract: { include: { sale: true } } },
   });
   if (!receiptToPay) return NextResponse.json({ message: 'Recibo no encontrado' }, { status: 404 });
-  if (auth.role === 'SELLER' && receiptToPay.contract.sellerUserId !== auth.userId && receiptToPay.contract.sale.sellerUserId !== auth.userId) {
-    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
-  }
-
   const receipt = await prisma.receipt.update({
     where: { id: receiptId },
     data: { status: 'PAID', paidAt: new Date() },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const ROLE_ROUTES: Record<string, string> = {
@@ -31,7 +32,10 @@ export default function LoginPage() {
 
       if (res.ok) {
         const data = await res.json();
-        const route = ROLE_ROUTES[data.user?.role] || "/dashboard";
+        const requestedRoute = new URLSearchParams(window.location.search).get("next");
+        const route = requestedRoute?.startsWith("/") && !requestedRoute.startsWith("//")
+          ? requestedRoute
+          : ROLE_ROUTES[data.user?.role] || "/dashboard";
         router.push(route);
         router.refresh();
       } else {
@@ -204,9 +208,9 @@ export default function LoginPage() {
         </form>
 
         <div style={{ textAlign: "center", marginTop: "24px" }}>
-          <a href="/" style={{ color: "#64748b", fontSize: ".8rem", textDecoration: "none" }}>
+          <Link href="/" style={{ color: "#64748b", fontSize: ".8rem", textDecoration: "none" }}>
             ← Volver al Portal de Trabajadores
-          </a>
+          </Link>
         </div>
       </div>
     </div>

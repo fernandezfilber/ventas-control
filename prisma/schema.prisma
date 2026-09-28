@@ -25,11 +25,12 @@ model User {
 }
 
 model Employee {
-  id        Int      @id @default(autoincrement())
-  name      String
-  dni       String   @unique
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  name         String
+  dni          String   @unique
+  passwordHash String?
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
 }
 
 model Sale {

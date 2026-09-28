@@ -19,7 +19,7 @@ interface Contract {
   status: string;
   reminderMode: string;
   monthlyAmount: number;
-  sale: { names: string; dni: string; address: string; phone: string; internetPlan: string; locationLink: string };
+  sale: { id: number; names: string; dni: string; address: string; phone: string; internetPlan: string; locationLink: string; details: string | null };
   clientUser: { id: number; username: string; whatsappRemindersEnabled: boolean } | null;
   receipts: Receipt[];
 }
@@ -36,19 +36,40 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState<ClientUserOption[]>([]);
   const [linking, setLinking] = useState(false);
   const [reminderMode, setReminderMode] = useState("MANUAL");
   const [savingReminderMode, setSavingReminderMode] = useState(false);
+  const [editingClient, setEditingClient] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
+  const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", details: "" });
 
   useEffect(() => {
     let active = true;
+    fetch("/api/users/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => {
+        if (active) setIsAdmin(user?.role === "ADMIN");
+      })
+      .catch(() => {});
     fetch(`/api/contracts/${id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!active) return;
         setContract(data);
-        if (data) setReminderMode(data.reminderMode || "MANUAL");
+        if (data) {
+          setReminderMode(data.reminderMode || "MANUAL");
+          setClientData({
+            names: data.sale.names,
+            dni: data.sale.dni,
+            address: data.sale.address,
+            phone: data.sale.phone,
+            locationLink: data.sale.locationLink,
+            internetPlan: data.sale.internetPlan || "",
+            details: data.sale.details || "",
+          });
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -88,6 +109,30 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       }
     } catch {
       alert("Error de red");
+    }
+  };
+
+  const handleSaveClient = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!contract) return;
+    setSavingClient(true);
+    try {
+      const res = await fetch(`/api/sales/${contract.sale.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clientData),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.message || "No se pudieron actualizar los datos del cliente.");
+        return;
+      }
+      setEditingClient(false);
+      refreshContract();
+    } catch {
+      alert("Error de conexión.");
+    } finally {
+      setSavingClient(false);
     }
   };
 
@@ -202,6 +247,56 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
               </div>
             )}
           </div>
+
+          <section style={{ marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+              <h3 style={{ color: "var(--fv-navy)", fontSize: "1rem" }}>Datos del cliente</h3>
+              <button type="button" onClick={() => setEditingClient(!editingClient)} className="btn-primary" style={{ width: "auto", padding: "8px 12px" }}>
+                {editingClient ? "Cancelar" : "Editar datos"}
+              </button>
+            </div>
+            {editingClient ? (
+              <form onSubmit={handleSaveClient}>
+                <div className="form-group">
+                  <label>Nombre completo</label>
+                  <input required value={clientData.names} onChange={(event) => setClientData({ ...clientData, names: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>DNI</label>
+                  <input required value={clientData.dni} onChange={(event) => setClientData({ ...clientData, dni: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Teléfono</label>
+                  <input required type="tel" value={clientData.phone} onChange={(event) => setClientData({ ...clientData, phone: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Dirección</label>
+                  <input required value={clientData.address} onChange={(event) => setClientData({ ...clientData, address: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Ubicación en mapa</label>
+                  <input required type="url" value={clientData.locationLink} onChange={(event) => setClientData({ ...clientData, locationLink: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Plan de internet</label>
+                  <input value={clientData.internetPlan} onChange={(event) => setClientData({ ...clientData, internetPlan: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Detalles</label>
+                  <textarea value={clientData.details} onChange={(event) => setClientData({ ...clientData, details: event.target.value })} />
+                </div>
+                <button type="submit" className="btn-primary" disabled={savingClient}>
+                  {savingClient ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </form>
+            ) : (
+              <div style={{ fontSize: "0.9rem", color: "var(--text-light)" }}>
+                <div><strong>Nombre:</strong> {contract.sale.names}</div>
+                <div><strong>DNI:</strong> {contract.sale.dni}</div>
+                {contract.sale.details && <div><strong>Detalles:</strong> {contract.sale.details}</div>}
+              </div>
+            )}
+          </section>
         </div>
       </div>
 
@@ -271,9 +366,11 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                     <a href={whatsappUrl} target="_blank" rel="noreferrer" aria-label={`Enviar recordatorio WhatsApp a ${contract.sale.names}`} style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#15803d", border: "1px solid #86efac", borderRadius: "6px", padding: "6px 9px", fontSize: "0.75rem", textDecoration: "none" }}>
                       <FiMessageCircle /> WhatsApp
                     </a>
-                    <button onClick={() => handleMarkPaid(r.id)} className="btn-success" style={{ padding: "6px 12px", fontSize: "0.75rem", borderRadius: "6px" }}>
-                      Marcar Pagado
-                    </button>
+                    {isAdmin && (
+                      <button onClick={() => handleMarkPaid(r.id)} className="btn-success" style={{ padding: "6px 12px", fontSize: "0.75rem", borderRadius: "6px" }}>
+                        Marcar Pagado
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div style={{ fontSize: "0.75rem", color: "var(--text-light)" }}>

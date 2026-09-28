@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FiTrendingUp, FiUsers, FiDollarSign } from "react-icons/fi";
+import { FiTrendingUp, FiUsers, FiMessageCircle } from "react-icons/fi";
+
+type ContractSummary = { status: string; receipts: { status: string }[] };
 
 export default function SellerDashboard() {
-  const [stats, setStats] = useState({ totalClients: 0, activeContracts: 0, totalRevenue: 0 });
+  const [stats, setStats] = useState({ totalClients: 0, activeContracts: 0, pendingReminders: 0 });
   const [timeframe, setTimeframe] = useState("mes");
   const [loading, setLoading] = useState(true);
 
@@ -13,21 +15,20 @@ export default function SellerDashboard() {
     fetch("/api/contracts")
       .then((res) => res.json())
       .then((contracts) => {
-        let totalRev = 0;
+        let pendingReminders = 0;
         let active = 0;
         
-        contracts.forEach((c: any) => {
+        contracts.forEach((c: ContractSummary) => {
           if (c.status === "ACTIVE") active++;
-          // Sum up paid receipts
-          c.receipts.forEach((r: any) => {
-            if (r.status === "PAID") totalRev += r.amount;
+          c.receipts.forEach((r) => {
+            if (r.status !== "PAID") pendingReminders++;
           });
         });
 
         setStats({
           totalClients: contracts.length,
           activeContracts: active,
-          totalRevenue: totalRev,
+          pendingReminders,
         });
         setLoading(false);
       })
@@ -78,11 +79,11 @@ export default function SellerDashboard() {
           <div className="stat-card gold" style={{ gridColumn: "span 2" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
               <div style={{ background: "rgba(245,158,11,.1)", padding: "8px", borderRadius: "10px", color: "var(--fv-gold)" }}>
-                <FiDollarSign size={20} />
+                <FiMessageCircle size={20} />
               </div>
-              <div style={{ fontSize: "0.85rem", color: "var(--text-light)", fontWeight: 600 }}>Ingresos Recaudados ({timeframe})</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-light)", fontWeight: 600 }}>Pagos pendientes de recordatorio</div>
             </div>
-            <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--fv-navy)" }}>S/ {stats.totalRevenue.toFixed(2)}</div>
+            <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--fv-navy)" }}>{stats.pendingReminders}</div>
           </div>
         </div>
       )}

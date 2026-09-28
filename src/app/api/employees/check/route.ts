@@ -9,7 +9,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'DNI es requerido' }, { status: 400 });
     }
 
-    const employee = await prisma.employee.findUnique({ where: { dni } });
+    const employee = await prisma.employee.findUnique({
+      where: { dni: dni.trim() },
+      select: { id: true, name: true, dni: true, status: true },
+    });
 
     if (!employee) {
       return NextResponse.json({ status: 'NOT_FOUND', message: 'No registrado' });

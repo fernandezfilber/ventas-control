@@ -44,7 +44,7 @@ export async function PUT(
       const existingUser = await prisma.user.findUnique({ where: { username: updated.dni } });
       let sellerAccount = existingUser;
       if (!sellerAccount) {
-        const hashedPassword = await bcrypt.hash(updated.dni, 10);
+        const hashedPassword = updated.passwordHash || await bcrypt.hash(updated.dni, 10);
         sellerAccount = await prisma.user.create({
           data: {
             username: updated.dni,
@@ -56,7 +56,11 @@ export async function PUT(
       } else if (sellerAccount.role !== 'ADMIN') {
         sellerAccount = await prisma.user.update({
           where: { id: sellerAccount.id },
-          data: { role: 'SELLER', fullName: updated.name },
+          data: {
+            role: 'SELLER',
+            fullName: updated.name,
+            ...(updated.passwordHash ? { password: updated.passwordHash } : {}),
+          },
         });
       }
 
@@ -71,9 +75,19 @@ export async function PUT(
         where: { sellerUserId: null, sale: { sellerUserId: sellerAccount.id } },
         data: { sellerUserId: sellerAccount.id },
       });
+      await prisma.employee.update({
+        where: { id: updated.id },
+        data: { passwordHash: null },
+      });
     }
 
-    return NextResponse.json(updated);
+    return NextResponse.json({
+      id: updated.id,
+      name: updated.name,
+      dni: updated.dni,
+      status: updated.status,
+      createdAt: updated.createdAt,
+    });
   } catch (error) {
     console.error('Error updating employee:', error);
     return NextResponse.json({ message: 'Error al actualizar empleado' }, { status: 500 });

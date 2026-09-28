@@ -13,9 +13,15 @@ export async function PUT(
   const token = cookieStore.get('auth-token')?.value;
   if (!token) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
 
+  let authUserId: number;
+  let authRole: string;
   try {
     const { payload } = await jwtVerify(token, SECRET);
-    if (payload.role !== 'ADMIN') return NextResponse.json({ message: 'Solo un administrador puede actualizar ventas' }, { status: 403 });
+    if (payload.role !== 'ADMIN' && payload.role !== 'SELLER') {
+      return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+    }
+    authUserId = payload.userId as number;
+    authRole = payload.role as string;
   } catch {
     return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
   }
@@ -29,13 +35,26 @@ export async function PUT(
       return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (data.status !== undefined) updateData.status = data.status;
-    if (data.clientId !== undefined) updateData.clientId = data.clientId;
+    const existingSale = await prisma.sale.findUnique({ where: { id } });
+    if (!existingSale) return NextResponse.json({ message: 'Cliente no encontrado' }, { status: 404 });
+    if (authRole === 'SELLER' && existingSale.sellerUserId !== authUserId) {
+      return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+    }
 
+    const updateData: Record<string, unknown> = {};
     const installedAt = new Date();
-    if (data.status === 'INSTALLED') updateData.installedAt = installedAt;
-    if (data.status === 'PENDING') updateData.installedAt = null;
+    if (authRole === 'ADMIN') {
+      if (data.status !== undefined) updateData.status = data.status;
+      if (data.clientId !== undefined) updateData.clientId = data.clientId;
+
+      if (data.status === 'INSTALLED') updateData.installedAt = installedAt;
+      if (data.status === 'PENDING') updateData.installedAt = null;
+    } else {
+      const editableFields = ['dni', 'names', 'address', 'phone', 'locationLink', 'referencePhotos', 'installationDate', 'installationTimeRange', 'internetPlan', 'details'];
+      for (const field of editableFields) {
+        if (data[field] !== undefined) updateData[field] = data[field];
+      }
+    }
 
     const updatedSale = await prisma.sale.update({
       where: { id },
@@ -43,7 +62,7 @@ export async function PUT(
     });
 
     // Auto-generate contract when sale is marked as INSTALLED
-    if (data.status === 'INSTALLED') {
+    if (authRole === 'ADMIN' && data.status === 'INSTALLED') {
       const existingContract = await prisma.contract.findUnique({ where: { saleId: id } });
 
       if (!existingContract) {
