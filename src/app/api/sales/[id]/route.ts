@@ -30,6 +30,7 @@ export async function PUT(
     const resolvedParams = await params;
     const id = parseInt(resolvedParams.id, 10);
     const data = await req.json();
+    const confirmsInstallation = data.status === 'INSTALLED';
 
     if (isNaN(id)) {
       return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
@@ -39,6 +40,12 @@ export async function PUT(
     if (!existingSale) return NextResponse.json({ message: 'Cliente no encontrado' }, { status: 404 });
     if (authRole === 'SELLER' && existingSale.sellerUserId !== authUserId) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+    }
+    if (authRole === 'SELLER' && data.status !== undefined && !confirmsInstallation) {
+      return NextResponse.json({ message: 'El asesor solo puede confirmar la instalación de su cliente' }, { status: 403 });
+    }
+    if (confirmsInstallation && (!Number.isFinite(data.monthlyAmount) || data.monthlyAmount <= 0)) {
+      return NextResponse.json({ message: 'Ingresa un monto mensual válido mayor que cero' }, { status: 400 });
     }
 
     const updateData: Record<string, unknown> = {};
@@ -50,6 +57,10 @@ export async function PUT(
       if (data.status === 'INSTALLED') updateData.installedAt = installedAt;
       if (data.status === 'PENDING') updateData.installedAt = null;
     } else {
+      if (confirmsInstallation) {
+        updateData.status = 'INSTALLED';
+        updateData.installedAt = installedAt;
+      }
       const editableFields = ['dni', 'names', 'address', 'phone', 'locationLink', 'referencePhotos', 'installationDate', 'installationTimeRange', 'internetPlan', 'details'];
       for (const field of editableFields) {
         if (data[field] !== undefined) updateData[field] = data[field];
@@ -62,11 +73,11 @@ export async function PUT(
     });
 
     // Auto-generate contract when sale is marked as INSTALLED
-    if (authRole === 'ADMIN' && data.status === 'INSTALLED') {
+    if (confirmsInstallation) {
       const existingContract = await prisma.contract.findUnique({ where: { saleId: id } });
 
       if (!existingContract) {
-        const monthlyAmount = data.monthlyAmount || 0;
+        const monthlyAmount = data.monthlyAmount;
         const startDate = installedAt;
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + 3);

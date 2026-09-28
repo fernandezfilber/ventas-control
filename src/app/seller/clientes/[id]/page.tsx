@@ -51,6 +51,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", details: "" });
   const [signing, setSigning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [hasSignature, setHasSignature] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -173,17 +174,19 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     context.lineCap = "round";
     context.lineTo(point.x, point.y);
     context.stroke();
+    setHasSignature(true);
   };
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSignature(false);
   };
 
   const handleSellerSign = async () => {
     if (!contract || !canvasRef.current) return;
     const signature = canvasRef.current.toDataURL("image/png");
-    if (signature.length < 1500) {
+    if (!hasSignature) {
       alert("Dibuja tu firma antes de guardarla.");
       return;
     }

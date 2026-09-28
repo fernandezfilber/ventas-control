@@ -31,6 +31,22 @@ export default function SellerClients() {
   const [showModal, setShowModal] = useState(false);
   const [newClient, setNewClient] = useState({ fullName: "", dni: "" });
   const [creating, setCreating] = useState(false);
+  const [confirmingSaleId, setConfirmingSaleId] = useState<number | null>(null);
+
+  const loadSellerClients = async () => {
+    try {
+      const [contractsRes, salesRes] = await Promise.all([fetch("/api/contracts"), fetch("/api/sales")]);
+      if (!contractsRes.ok || !salesRes.ok) throw new Error("No se pudieron cargar los clientes");
+      const [contractData, saleData] = await Promise.all([contractsRes.json(), salesRes.json()]);
+      setContracts(contractData);
+      setSales(saleData);
+    } catch {
+      setContracts([]);
+      setSales([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([fetch("/api/contracts"), fetch("/api/sales")])
@@ -39,10 +55,43 @@ export default function SellerClients() {
         const [contractData, saleData] = await Promise.all([contractsRes.json(), salesRes.json()]);
         setContracts(contractData);
         setSales(saleData);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setContracts([]);
+        setSales([]);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  const handleConfirmInstallation = async (sale: Sale) => {
+    const monthlyAmountInput = prompt(`Monto mensual del contrato para ${sale.names} (S/):`);
+    if (monthlyAmountInput === null) return;
+    const monthlyAmount = Number(monthlyAmountInput.replace(",", "."));
+    if (!Number.isFinite(monthlyAmount) || monthlyAmount <= 0) {
+      alert("Ingresa un monto mensual válido mayor que cero.");
+      return;
+    }
+    if (!confirm(`¿Confirmas que la instalación de ${sale.names} fue realizada? Se generará el contrato por S/ ${monthlyAmount.toFixed(2)} al mes.`)) return;
+
+    setConfirmingSaleId(sale.id);
+    try {
+      const res = await fetch(`/api/sales/${sale.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "INSTALLED", monthlyAmount }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        alert(error.message || "No se pudo confirmar la instalación.");
+        return;
+      }
+      await loadSellerClients();
+    } catch {
+      alert("Error de conexión.");
+    } finally {
+      setConfirmingSaleId(null);
+    }
+  };
 
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,7 +202,19 @@ export default function SellerClients() {
                 <div style={{ fontSize: "0.8rem", color: "var(--text-light)" }}>DNI: {sale.dni} · Venta {sale.correlativeId} · {sale.internetPlan || "Sin plan"}</div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-light)", marginTop: "4px" }}>El contrato y las opciones de firma aparecerán cuando administración confirme la instalación.</div>
               </div>
-              <span className="badge badge-pending">{sale.status === "INSTALLED" ? "Instalación confirmada" : "Pendiente de instalación"}</span>
+              {sale.status === "PENDING" ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={confirmingSaleId === sale.id}
+                  onClick={() => handleConfirmInstallation(sale)}
+                  style={{ width: "auto", padding: "8px 12px", whiteSpace: "nowrap" }}
+                >
+                  {confirmingSaleId === sale.id ? "Confirmando..." : "Confirmar instalación"}
+                </button>
+              ) : (
+                <span className="badge badge-pending">Instalación confirmada</span>
+              )}
             </div>
           ))}
         </div>
