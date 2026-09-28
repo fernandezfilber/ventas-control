@@ -45,6 +45,14 @@ Configura estos valores en el entorno de ejecución, no en el código:
 - `WHATSAPP_DEFAULT_COUNTRY_CODE` (por defecto `51` para Perú)
 - `WHATSAPP_GRAPH_VERSION` (por defecto `v22.0`)
 
+## Despliegue en Docker
+
+Antes de desplegar, crea un archivo `.env` junto a `docker-compose.yml` en el servidor. Usa las credenciales configuradas para MySQL y Redis y define también un `JWT_SECRET` aleatorio y privado. No subas ese archivo al repositorio. La aplicación se conecta a `mysql_central:3306` y `redis_central:6379` en la red Docker externa `shared-infra`.
+
+`TRAEFIK_ACME_EMAIL` pertenece al servicio central de Traefik, no a `ventas-app`. Configúralo allí en el resolver ACME que ya usa la etiqueta `myresolver` (por ejemplo, `--certificatesresolvers.myresolver.acme.email=${TRAEFIK_ACME_EMAIL}`). El servicio Traefik debe compartir la red `shared-infra`.
+
+El archivo `.env.example` lista las variables esperadas por el despliegue. Copia la plantilla en el servidor, completa los valores privados y luego ejecuta `docker-compose up --build -d`.
+
 Después de actualizar el esquema Prisma, aplica los cambios a la base de datos con `npm exec -- prisma db push` usando un `DATABASE_URL` MySQL válido. La variable actual debe comenzar con `mysql://`.
 
 ## Deploy on Vercel

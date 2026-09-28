@@ -20,7 +20,7 @@ WORKDIR /app
 
 RUN apk add --no-cache openssl
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 COPY --from=base /app/public ./public
 COPY --from=base /app/.next/standalone ./
@@ -29,7 +29,7 @@ COPY --from=base /app/prisma ./prisma
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
 
 # El comando inicia la aplicación. NOTA: Para producción con MySQL se recomienda
 # correr "npx prisma db push" en el servidor o durante un script de inicio,
