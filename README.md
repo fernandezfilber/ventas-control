@@ -1,63 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ForwardVision — Control de clientes y pagos
 
-## Getting Started
+Aplicación web responsive para administrar asesores, clientes, contratos de servicio, mensualidades y pagos.
 
-First, run the development server:
+## Puesta en marcha
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Instala dependencias: `npm install`.
+2. Configura `DATABASE_URL` para MySQL, un `JWT_SECRET` aleatorio y `ADMIN_SETUP_TOKEN` para habilitar el registro inicial del administrador.
+3. Actualiza el cliente y el esquema de Prisma: `npm exec -- prisma generate` y `npm exec -- prisma db push`.
+4. Inicia el proyecto con `npm run dev`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La cuenta administrativa se crea una sola vez mediante `POST /api/auth/seed`, enviando el token en la cabecera `x-admin-setup-token` y un usuario/contraseña propios en el cuerpo. La contraseña inicial debe tener al menos 12 caracteres. No expongas credenciales, tokens ni archivos `.env` en el repositorio.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Roles y flujo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Administrador:** registra asesores y consulta las ventas globales por día o mes, además de contratos.
+- **Asesor:** registra y administra su cartera de clientes, importa hojas Excel, descarga listas y confirma pagos recibidos.
+- **Cliente:** consulta su mensualidad, contrato y pagos; puede firmar y descargar el contrato en PDF.
 
-## Learn More
+Las cuentas nuevas de clientes usan el DNI como usuario y contraseña inicial. El asesor debe comunicarlo al cliente y recomendar que cambie la contraseña.
 
-To learn more about Next.js, take a look at the following resources:
+## WhatsApp
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Los recordatorios se envían manualmente desde la ficha del cliente: el botón abre WhatsApp con un mensaje preparado y el asesor debe revisarlo y enviarlo desde la cuenta iniciada en el dispositivo. Contacto de ForwardVision: **+51 955 318 590**.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+El envío automático no está habilitado. Una cuenta personal o la aplicación WhatsApp Business no permiten automatizar mensajes desde el servidor. Se necesitará WhatsApp Business Platform/Cloud API, consentimiento del cliente y plantillas aprobadas para habilitarlo posteriormente.
 
-## Recordatorios de pago por WhatsApp
+## Estado del contrato
 
-Los asesores pueden abrir WhatsApp con un mensaje preparado para cada recibo pendiente. Para el envío automático, el cliente debe activar el consentimiento desde su portal y el asesor debe elegir el modo **Automático** en el contrato.
+El PDF contiene las condiciones solicitadas: permanencia mínima de tres meses, cargo indicado de S/ 100.00 por cancelación anticipada y responsabilidad por reparación comprobable de materiales dañados por uso indebido o negligencia. La empresa aún debe incorporar RUC, domicilio legal y logo; por eso el PDF se identifica expresamente como borrador y debe revisarse antes de usarse como contrato definitivo.
 
-El envío automático necesita una cuenta de WhatsApp Business Platform, una plantilla aprobada por Meta con tres variables de cuerpo (`{{1}}` cliente, `{{2}}` monto, `{{3}}` vencimiento) y un programador externo que invoque diariamente `GET /api/cron/payment-reminders` por HTTPS con `Authorization: Bearer <CRON_SECRET>`. El endpoint solo toma recibos pendientes con vencimiento dentro de los próximos tres días y vuelve a intentar como máximo cada 24 horas.
+## Excel de clientes
 
-Configura estos valores en el entorno de ejecución, no en el código:
-
-- `CRON_SECRET`
-- `WHATSAPP_ACCESS_TOKEN`
-- `WHATSAPP_PHONE_NUMBER_ID`
-- `WHATSAPP_TEMPLATE_NAME`
-- `WHATSAPP_TEMPLATE_LANGUAGE` (por defecto `es_PE`)
-- `WHATSAPP_DEFAULT_COUNTRY_CODE` (por defecto `51` para Perú)
-- `WHATSAPP_GRAPH_VERSION` (por defecto `v22.0`)
+La primera hoja del archivo debe incluir estas columnas: `nombres`, `dni`, `telefono`, `direccion`, `plan` y `mensualidad`. Cada fila válida genera una cuenta de cliente, contrato y tres mensualidades.
 
 ## Despliegue en Docker
 
-Antes de desplegar, crea un archivo `.env` junto a `docker-compose.yml` en el servidor. Usa las credenciales configuradas para MySQL y Redis y define también un `JWT_SECRET` aleatorio y privado. No subas ese archivo al repositorio. La aplicación se conecta a `mysql_central:3306` y `redis_central:6379` en la red Docker externa `shared-infra`.
+Configura un archivo `.env` en el servidor con las credenciales de MySQL y un `JWT_SECRET` aleatorio. No lo subas al repositorio. La aplicación se conecta a `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`.
 
-`TRAEFIK_ACME_EMAIL` pertenece al servicio central de Traefik, no a `ventas-app`. Configúralo allí en el resolver ACME que ya usa la etiqueta `myresolver` (por ejemplo, `--certificatesresolvers.myresolver.acme.email=${TRAEFIK_ACME_EMAIL}`). El servicio Traefik debe compartir la red `shared-infra`.
-
-El archivo `.env.example` lista las variables esperadas por el despliegue. Copia la plantilla en el servidor, completa los valores privados y luego ejecuta `docker-compose up --build -d`.
-
-Después de actualizar el esquema Prisma, aplica los cambios a la base de datos con `npm exec -- prisma db push` usando un `DATABASE_URL` MySQL válido. La variable actual debe comenzar con `mysql://`.
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-"# ventas-control" 
+`TRAEFIK_ACME_EMAIL` pertenece al servicio central de Traefik; configúralo en el resolver ACME correspondiente. Después de definir las variables privadas, ejecuta `docker-compose up --build -d`.

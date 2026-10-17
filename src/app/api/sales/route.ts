@@ -60,7 +60,6 @@ export async function POST(req: Request) {
         address: data.address,
         phone: data.phone,
         locationLink: data.locationLink,
-        referencePhotos: data.referencePhotos || '',
         installationDate: data.installationDate || null,
         installationTimeRange: data.installationTimeRange || null,
         internetPlan: data.internetPlan || null,
@@ -87,6 +86,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const dni = searchParams.get('dni');
     const date = searchParams.get('date');
+    const month = searchParams.get('month');
     const status = searchParams.get('status');
 
     const where: Record<string, unknown> = {};
@@ -120,8 +120,20 @@ export async function GET(req: Request) {
       };
     }
 
+    if (month) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+        return NextResponse.json({ message: 'Mes inválido' }, { status: 400 });
+      }
+      const [year, monthNumber] = month.split('-').map(Number);
+      where.createdAt = {
+        gte: new Date(year, monthNumber - 1, 1),
+        lt: new Date(year, monthNumber, 1),
+      };
+    }
+
     const sales = await prisma.sale.findMany({
       where,
+      include: { contract: { select: { monthlyAmount: true } } },
       orderBy: { id: 'desc' },
     });
 

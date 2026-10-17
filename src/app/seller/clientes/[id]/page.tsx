@@ -2,8 +2,8 @@
 
 import { useEffect, useState, use, useRef } from "react";
 import { useRouter } from "next/navigation";
-import jsPDF from "jspdf";
 import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink, FiMessageCircle, FiDownload, FiCheck, FiX } from "react-icons/fi";
+import { downloadServiceContractPdf } from "@/lib/contract-pdf";
 
 interface Receipt {
   id: number;
@@ -19,13 +19,15 @@ interface Contract {
   contractNumber: string;
   startDate: string;
   endDate: string;
+  paymentDay: number;
   status: string;
-  reminderMode: string;
+  clientSignedAt: string | null;
+  sellerSignedAt: string | null;
   monthlyAmount: number;
   sellerSignature: string | null;
   clientSignature: string | null;
-  sale: { id: number; names: string; dni: string; address: string; phone: string; internetPlan: string; locationLink: string; details: string | null };
-  clientUser: { id: number; username: string; whatsappRemindersEnabled: boolean } | null;
+  sale: { id: number; names: string; dni: string; address: string; phone: string; internetPlan: string | null; locationLink: string; details: string | null };
+  clientUser: { id: number; username: string } | null;
   receipts: Receipt[];
 }
 
@@ -41,14 +43,12 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [canConfirmPayments, setCanConfirmPayments] = useState(false);
   const [users, setUsers] = useState<ClientUserOption[]>([]);
   const [linking, setLinking] = useState(false);
-  const [reminderMode, setReminderMode] = useState("MANUAL");
-  const [savingReminderMode, setSavingReminderMode] = useState(false);
   const [editingClient, setEditingClient] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
-  const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", details: "" });
+  const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", monthlyAmount: "", details: "" });
   const [signing, setSigning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -59,7 +59,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     fetch("/api/users/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((user) => {
-        if (active) setIsAdmin(user?.role === "ADMIN");
+        if (active) setCanConfirmPayments(user?.role === "ADMIN" || user?.role === "SELLER");
       })
       .catch(() => {});
     fetch(`/api/contracts/${id}`)
@@ -68,7 +68,6 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         if (!active) return;
         setContract(data);
         if (data) {
-          setReminderMode(data.reminderMode || "MANUAL");
           setClientData({
             names: data.sale.names,
             dni: data.sale.dni,
@@ -76,6 +75,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
             phone: data.sale.phone,
             locationLink: data.sale.locationLink,
             internetPlan: data.sale.internetPlan || "",
+            monthlyAmount: String(data.monthlyAmount),
             details: data.sale.details || "",
           });
         }
@@ -100,7 +100,6 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         setContract(data);
-        if (data) setReminderMode(data.reminderMode || "MANUAL");
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -126,7 +125,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     if (!contract) return;
     setSavingClient(true);
     try {
-      const res = await fetch(`/api/sales/${contract.sale.id}`, {
+      const res = await fetch(`/api/clients/${contract.sale.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clientData),
@@ -213,39 +212,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
 
   const downloadContractPdf = () => {
     if (!contract) return;
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.setTextColor(30, 64, 175);
-    doc.text("ForwardVision", 105, 20, { align: "center" });
-    doc.setFontSize(13);
-    doc.setTextColor(0, 0, 0);
-    doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS", 105, 30, { align: "center" });
-    doc.setFontSize(10);
-    doc.text(`Contrato N°: ${contract.contractNumber}`, 20, 45);
-    doc.text(`Inicio: ${new Date(contract.startDate).toLocaleDateString("es-PE")}`, 20, 52);
-    doc.text(`Vencimiento: ${new Date(contract.endDate).toLocaleDateString("es-PE")}`, 20, 59);
-    doc.setFontSize(12);
-    doc.text("DATOS DEL CLIENTE", 20, 75);
-    doc.setFontSize(10);
-    doc.text(doc.splitTextToSize(`Nombre: ${contract.sale.names}`, 170), 20, 84);
-    doc.text(`DNI: ${contract.sale.dni}`, 20, 92);
-    doc.text(doc.splitTextToSize(`Dirección: ${contract.sale.address}`, 170), 20, 99);
-    doc.text(`Teléfono: ${contract.sale.phone}`, 20, 107);
-    doc.text(`Plan: ${contract.sale.internetPlan}`, 20, 114);
-    doc.text(`Monto mensual: S/ ${contract.monthlyAmount.toFixed(2)}`, 20, 121);
-    doc.setFontSize(12);
-    doc.text("CONDICIONES DEL SERVICIO", 20, 140);
-    doc.setFontSize(10);
-    const terms = "El cliente se compromete a mantener el servicio por un periodo mínimo de 3 meses. El pago deberá realizarse según el cronograma acordado. En caso de incumplimiento, ForwardVision podrá suspender el servicio.";
-    doc.text(doc.splitTextToSize(terms, 170), 20, 148);
-    doc.setFontSize(12);
-    doc.text("FIRMAS", 20, 190);
-    doc.setFontSize(10);
-    doc.text("ASESOR", 55, 226, { align: "center" });
-    doc.text("CLIENTE", 155, 226, { align: "center" });
-    if (contract.sellerSignature) doc.addImage(contract.sellerSignature, "PNG", 30, 196, 50, 24);
-    if (contract.clientSignature) doc.addImage(contract.clientSignature, "PNG", 130, 196, 50, 24);
-    doc.save(`Contrato_${contract.contractNumber}.pdf`);
+    downloadServiceContractPdf(contract);
   };
 
   const handleLinkUser = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -267,28 +234,6 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       alert("Error de red");
     } finally {
       setLinking(false);
-    }
-  };
-
-  const handleReminderModeChange = async (mode: string) => {
-    if (mode === "AUTOMATIC" && !contract?.clientUser?.whatsappRemindersEnabled) return;
-    setSavingReminderMode(true);
-    try {
-      const res = await fetch(`/api/contracts/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reminderMode: mode }),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        alert(error.message || "No se pudo guardar el modo de recordatorio.");
-        return;
-      }
-      setReminderMode(mode);
-    } catch {
-      alert("Error de conexión.");
-    } finally {
-      setSavingReminderMode(false);
     }
   };
 
@@ -401,6 +346,10 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                   <input value={clientData.internetPlan} onChange={(event) => setClientData({ ...clientData, internetPlan: event.target.value })} />
                 </div>
                 <div className="form-group">
+                  <label>Mensualidad (S/)</label>
+                  <input required type="number" min="0.01" step="0.01" value={clientData.monthlyAmount} onChange={(event) => setClientData({ ...clientData, monthlyAmount: event.target.value })} />
+                </div>
+                <div className="form-group">
                   <label>Detalles</label>
                   <textarea value={clientData.details} onChange={(event) => setClientData({ ...clientData, details: event.target.value })} />
                 </div>
@@ -454,21 +403,8 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
 
       <section className="card" style={{ marginBottom: "20px" }}>
         <h3 style={{ color: "var(--fv-navy)", marginBottom: "8px" }}>Recordatorios de pago por WhatsApp</h3>
-        <select
-          value={reminderMode}
-          disabled={savingReminderMode || !contract.clientUser}
-          onChange={(event) => handleReminderModeChange(event.target.value)}
-          style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-color)" }}
-        >
-          <option value="MANUAL">Manual: el asesor envía cada aviso</option>
-          <option value="AUTOMATIC" disabled={!contract.clientUser?.whatsappRemindersEnabled}>Automático: enviar cerca del vencimiento</option>
-        </select>
         <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--text-light)" }}>
-          {!contract.clientUser
-            ? "Vincula una cuenta de cliente para configurar avisos automáticos."
-            : contract.clientUser.whatsappRemindersEnabled
-              ? "El cliente autorizó los avisos. El modo automático requiere configurar WhatsApp Business y el cron del servidor."
-              : "El cliente aún no autorizó avisos automáticos; puede hacerlo desde su portal."}
+          Los avisos se envían manualmente desde WhatsApp. La cuenta debe estar iniciada en este dispositivo; confirma el pago aquí cuando el cliente pague.
         </p>
       </section>
 
@@ -481,7 +417,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
           const isOverdue = r.status === "OVERDUE" || (!isPaid && new Date(r.dueDate) < new Date());
           const phoneDigits = contract.sale.phone.replace(/\D/g, "");
           const whatsappPhone = phoneDigits.length === 9 ? `51${phoneDigits}` : phoneDigits;
-          const reminderMessage = `Hola ${contract.sale.names}, te recordamos el pago de S/ ${r.amount.toFixed(2)} correspondiente al mes ${r.monthNumber}, con vencimiento el ${new Date(r.dueDate).toLocaleDateString("es-PE")}.`;
+          const reminderMessage = `Hola ${contract.sale.names}, te recordamos el pago de S/ ${r.amount.toFixed(2)} correspondiente al mes ${r.monthNumber}, con vencimiento el ${new Date(r.dueDate).toLocaleDateString("es-PE")}. Si ya pagaste, ignora este mensaje. ForwardVision: +51 955 318 590.`;
           const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(reminderMessage)}`;
           
           let statusColor = "var(--fv-blue)";
@@ -518,7 +454,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                     <a href={whatsappUrl} target="_blank" rel="noreferrer" aria-label={`Enviar recordatorio WhatsApp a ${contract.sale.names}`} style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "#15803d", border: "1px solid #86efac", borderRadius: "6px", padding: "6px 9px", fontSize: "0.75rem", textDecoration: "none" }}>
                       <FiMessageCircle /> WhatsApp
                     </a>
-                    {isAdmin && (
+                    {canConfirmPayments && (
                       <button onClick={() => handleMarkPaid(r.id)} className="btn-success" style={{ padding: "6px 12px", fontSize: "0.75rem", borderRadius: "6px" }}>
                         Marcar Pagado
                       </button>

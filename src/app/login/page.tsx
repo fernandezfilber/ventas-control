@@ -8,7 +8,6 @@ const ROLE_ROUTES: Record<string, string> = {
   ADMIN: "/dashboard",
   SELLER: "/seller",
   CLIENT: "/client",
-  TECHNICIAN: "/",
 };
 
 export default function LoginPage() {

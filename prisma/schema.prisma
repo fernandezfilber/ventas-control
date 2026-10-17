@@ -8,29 +8,38 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String
-  role      String   @default("SELLER")   // ADMIN | SELLER | CLIENT
-  fullName  String?
-  phone     String?
-  sellerId  Int?     // Para clientes: ID del asesor asignado
-  createdAt DateTime @default(now())
+  id                       Int        @id @default(autoincrement())
+  username                 String     @unique
+  password                 String
+  role                     String     @default("SELLER")
+  fullName                 String?
+  phone                    String?
+  sellerId                 Int?
+  whatsappRemindersEnabled Boolean    @default(false)
+  createdAt                DateTime   @default(now())
 
   clientContracts Contract[] @relation("ClientContracts")
   sellerContracts Contract[] @relation("SellerContracts")
+  clientSales     Sale[]     @relation("ClientSales")
+  sellerSales     Sale[]     @relation("SellerSales")
 }
 
 model Sale {
   id                    Int       @id @default(autoincrement())
   correlativeId         String    @unique
   clientId              String?   // código interno de caja
+  clientUserId          Int?
+  clientUser            User?     @relation("ClientSales", fields: [clientUserId], references: [id])
+  sellerUserId          Int?
+  sellerUser            User?     @relation("SellerSales", fields: [sellerUserId], references: [id])
   dni                   String
   names                 String
   address               String
   phone                 String
   locationLink          String    @db.Text
   installationDate      String?
+  installationTimeRange String?
+  referencePhotos       String?   @db.LongText
   internetPlan          String?
   details               String?   @db.Text
   status                String    @default("PENDING")   // PENDING | INSTALLED
@@ -60,6 +69,7 @@ model Contract {
   clientSignature String?   @db.LongText
   sellerSignature String?   @db.LongText
   paymentDay      Int
+  reminderMode     String    @default("MANUAL")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -75,7 +85,26 @@ model Receipt {
   paidAt              DateTime?
   amount              Float
   status              String    @default("PENDING") // PENDING | PAID | OVERDUE
-  reminderLastSentAt  DateTime?
+  lastReminderAt      DateTime? @map("reminderLastSentAt")
   reminderCount       Int       @default(0)
   createdAt           DateTime  @default(now())
+}
+
+model Employee {
+  id           Int      @id @default(autoincrement())
+  name         String
+  dni          String   @unique
+  passwordHash String?
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  userName  String
+  dni       String?
+  photoUrl  String   @db.LongText
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
 }

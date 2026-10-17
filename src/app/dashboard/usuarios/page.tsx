@@ -22,7 +22,7 @@ export default function AdminUsers() {
 
   const fetchUsers = () => {
     setLoading(true);
-    fetch("/api/users")
+    fetch("/api/users?role=SELLER")
       .then((res) => res.json())
       .then((data) => {
         setUsers(data);
@@ -35,10 +35,8 @@ export default function AdminUsers() {
     e.preventDefault();
     setCreating(true);
     
-    // Auto-fill password with username if not provided
     const payload = {
       ...newUser,
-      password: newUser.password || newUser.username
     };
 
     try {
@@ -67,9 +65,9 @@ export default function AdminUsers() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--fv-navy)" }}>Gestión de Usuarios</h2>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--fv-navy)" }}>Gestión de Asesores</h2>
         <button onClick={() => setShowModal(true)} className="btn-primary" style={{ width: "auto", display: "flex", alignItems: "center", gap: "6px" }}>
-          <FiUserPlus /> Nuevo Usuario
+          <FiUserPlus /> Nuevo asesor
         </button>
       </div>
 
@@ -110,7 +108,7 @@ export default function AdminUsers() {
         <div className="modal-overlay">
           <div className="modal-box">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--fv-navy)" }}>Registrar Nuevo Usuario</h3>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--fv-navy)" }}>Registrar asesor</h3>
               <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", color: "var(--text-light)" }}><FiX /></button>
             </div>
 
@@ -119,8 +117,6 @@ export default function AdminUsers() {
                 <label>Rol</label>
                 <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})}>
                   <option value="SELLER">Asesor de Ventas</option>
-                  <option value="ADMIN">Administrador</option>
-                  <option value="TECHNICIAN">Técnico</option>
                 </select>
               </div>
 
@@ -135,15 +131,15 @@ export default function AdminUsers() {
               </div>
 
               <div className="form-group">
-                <label>Contraseña (Opcional)</label>
-                <input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} placeholder="Si dejas vacío, será igual al usuario" />
+                <label>Contraseña inicial</label>
+                <input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} placeholder="Al menos 8 caracteres" minLength={8} required />
                 <div style={{ fontSize: "0.75rem", color: "var(--text-light)", marginTop: "4px" }}>
-                  Por defecto, la contraseña será igual al usuario ingresado.
+                  Comparte las credenciales con el asesor de forma privada.
                 </div>
               </div>
 
               <button type="submit" className="btn-primary" disabled={creating} style={{ marginTop: "16px" }}>
-                {creating ? "Registrando..." : "Registrar Usuario"}
+                {creating ? "Registrando..." : "Crear asesor"}
               </button>
             </form>
           </div>

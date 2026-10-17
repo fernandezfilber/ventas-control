@@ -14,7 +14,6 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrador",
   SELLER: "Asesor de Ventas",
   CLIENT: "Cliente",
-  TECHNICIAN: "Técnico",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

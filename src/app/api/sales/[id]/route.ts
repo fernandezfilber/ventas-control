@@ -61,7 +61,7 @@ export async function PUT(
         updateData.status = 'INSTALLED';
         updateData.installedAt = installedAt;
       }
-      const editableFields = ['dni', 'names', 'address', 'phone', 'locationLink', 'referencePhotos', 'installationDate', 'installationTimeRange', 'internetPlan', 'details'];
+      const editableFields = ['dni', 'names', 'address', 'phone', 'locationLink', 'installationDate', 'installationTimeRange', 'internetPlan', 'details'];
       for (const field of editableFields) {
         if (data[field] !== undefined) updateData[field] = data[field];
       }

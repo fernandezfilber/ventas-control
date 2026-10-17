@@ -17,28 +17,42 @@ async function getAuthUser() {
   }
 }
 
-// PUT — mark receipt as paid
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuthUser();
-  if (!auth || auth.role !== 'ADMIN') {
+  if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  if (!['ADMIN', 'SELLER'].includes(auth.role)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
   }
 
   const { id } = await params;
   const receiptId = parseInt(id, 10);
+  if (!Number.isInteger(receiptId) || receiptId <= 0) {
+    return NextResponse.json({ message: 'ID de recibo inválido' }, { status: 400 });
+  }
 
-  const receiptToPay = await prisma.receipt.findUnique({
+  const receipt = await prisma.receipt.findUnique({
     where: { id: receiptId },
-    include: { contract: { include: { sale: true } } },
+    include: { contract: { select: { sellerUserId: true, sale: { select: { sellerUserId: true } } } } },
   });
-  if (!receiptToPay) return NextResponse.json({ message: 'Recibo no encontrado' }, { status: 404 });
-  const receipt = await prisma.receipt.update({
-    where: { id: receiptId },
+  if (!receipt) return NextResponse.json({ message: 'Recibo no encontrado' }, { status: 404 });
+  if (auth.role === 'SELLER' &&
+    receipt.contract.sellerUserId !== auth.userId &&
+    receipt.contract.sale.sellerUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
+  if (receipt.status === 'PAID') return NextResponse.json(receipt);
+
+  const result = await prisma.receipt.updateMany({
+    where: { id: receiptId, status: 'PENDING' },
     data: { status: 'PAID', paidAt: new Date() },
   });
+  if (result.count === 0) {
+    return NextResponse.json({ message: 'El recibo ya no está pendiente de pago' }, { status: 409 });
+  }
 
-  return NextResponse.json(receipt);
+  const updated = await prisma.receipt.findUnique({ where: { id: receiptId } });
+  return NextResponse.json(updated);
 }

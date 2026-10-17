@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiBarChart2, FiUsers, FiFileText, FiUserCheck, FiLogOut, FiArrowLeft, FiLock } from "react-icons/fi";
+import { FiBarChart2, FiUsers, FiFileText, FiLogOut, FiArrowLeft, FiLock } from "react-icons/fi";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -21,9 +21,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navItems = [
     { href: "/dashboard", label: "Panel Principal", icon: <FiBarChart2 className="nav-icon" /> },
     { href: "/dashboard/contratos", label: "Contratos", icon: <FiFileText className="nav-icon" /> },
-    { href: "/dashboard/usuarios", label: "Usuarios / Asesores", icon: <FiUsers className="nav-icon" /> },
-    { href: "/dashboard/asistencia", label: "Control Asistencia", icon: <FiUserCheck className="nav-icon" /> },
-    { href: "/dashboard/empleados", label: "Gestión Empleados", icon: <FiUsers className="nav-icon" /> },
+    { href: "/dashboard/usuarios", label: "Asesores", icon: <FiUsers className="nav-icon" /> },
   ];
 
   return (
@@ -63,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile Nav for Admin */}
       <nav className="bottom-nav mobile-only">
-        {navItems.slice(0,4).map(item => (
+        {navItems.map(item => (
           <Link
             key={item.href}
             href={item.href}

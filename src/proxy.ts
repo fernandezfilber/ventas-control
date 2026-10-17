@@ -9,7 +9,6 @@ const ROLE_HOME: Record<string, string> = {
   ADMIN: '/dashboard',
   SELLER: '/seller',
   CLIENT: '/client',
-  TECHNICIAN: '/',
 };
 
 export default async function proxy(request: NextRequest) {
@@ -36,10 +35,6 @@ export default async function proxy(request: NextRequest) {
     if (pathname.startsWith('/client') && role !== 'CLIENT' && role !== 'ADMIN') {
       return NextResponse.redirect(new URL(ROLE_HOME[role] || '/login', request.url));
     }
-    if (pathname.startsWith('/ventas') && role !== 'SELLER' && role !== 'ADMIN') {
-      return NextResponse.redirect(new URL(ROLE_HOME[role] || '/login', request.url));
-    }
-
     return NextResponse.next();
   } catch {
     const response = NextResponse.redirect(new URL('/login', request.url));
@@ -49,5 +44,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/seller/:path*', '/client/:path*', '/ventas/:path*', '/perfil/:path*'],
+  matcher: ['/dashboard/:path*', '/seller/:path*', '/client/:path*', '/perfil/:path*'],
 };

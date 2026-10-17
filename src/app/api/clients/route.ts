@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
@@ -19,25 +20,35 @@ async function getAuth() {
 export async function GET(req: Request) {
   const auth = await getAuth();
   if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
+  if (!['ADMIN', 'SELLER'].includes(auth.role)) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
-  const month = searchParams.get('month'); // "2024-10"
-  const seller = searchParams.get('seller');
+  const month = searchParams.get('month');
+  const sellerId = searchParams.get('sellerId');
 
-  const where: Record<string, unknown> = { status: 'INSTALLED' };
+  const where: Record<string, unknown> = {};
 
-  // Solo instaladas (clientes activos con contrato)
   if (auth.role === 'SELLER') {
-    where.sellerNameOrId = auth.fullName || auth.username;
-  } else if (seller) {
-    where.sellerNameOrId = seller;
+    where.sellerUserId = auth.userId;
+  } else if (sellerId) {
+    const id = Number(sellerId);
+    if (!Number.isInteger(id) || id <= 0) {
+      return NextResponse.json({ message: 'Asesor inválido' }, { status: 400 });
+    }
+    where.sellerUserId = id;
   }
 
   if (month) {
-    const [y, m] = month.split('-').map(Number);
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 0, 23, 59, 59);
-    where.installedAt = { gte: start, lte: end };
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      return NextResponse.json({ message: 'Mes inválido' }, { status: 400 });
+    }
+    const [year, monthNumber] = month.split('-').map(Number);
+    where.createdAt = {
+      gte: new Date(year, monthNumber - 1, 1),
+      lt: new Date(year, monthNumber, 1),
+    };
   }
 
   const sales = await prisma.sale.findMany({
@@ -49,6 +60,7 @@ export async function GET(req: Request) {
           clientUser: { select: { id: true, username: true, fullName: true } },
         },
       },
+      sellerUser: { select: { id: true, username: true, fullName: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -65,72 +77,127 @@ export async function POST(req: Request) {
 
   try {
     const data = await req.json();
+    const names = typeof data.names === 'string' ? data.names.trim() : '';
+    const dni = typeof data.dni === 'string' ? data.dni.trim() : '';
+    const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
+    const address = typeof data.address === 'string' ? data.address.trim() : '';
+    const monthlyAmount = Number(String(data.monthlyAmount ?? '').replace(',', '.'));
 
-    const lastSale = await prisma.sale.findFirst({ orderBy: { id: 'desc' } });
-    const nextNum = lastSale ? parseInt(lastSale.correlativeId, 10) + 1 : 1;
-    const correlativeId = nextNum.toString().padStart(4, '0');
+    if (!names || !/^\d{8,12}$/.test(dni) || !phone || !address ||
+      !Number.isFinite(monthlyAmount) || monthlyAmount <= 0) {
+      return NextResponse.json({
+        message: 'Completa nombre, DNI, teléfono, dirección y un monto mensual válido.',
+      }, { status: 400 });
+    }
 
-    const sellerName = auth.fullName || auth.username;
-    const installedAt = new Date();
-    const endDate = new Date(installedAt);
-    endDate.setMonth(endDate.getMonth() + 3);
-    const paymentDay = installedAt.getDate();
+    let sellerId: number | null = auth.role === 'SELLER' ? auth.userId : null;
+    if (auth.role === 'ADMIN' && data.sellerId !== undefined && data.sellerId !== null) {
+      const requestedSellerId = Number(data.sellerId);
+      const seller = await prisma.user.findFirst({
+        where: { id: requestedSellerId, role: 'SELLER' },
+        select: { id: true },
+      });
+      if (!seller) return NextResponse.json({ message: 'Asesor no encontrado' }, { status: 400 });
+      sellerId = seller.id;
+    }
+    if (auth.role === 'ADMIN' && sellerId === null) {
+      return NextResponse.json({ message: 'Selecciona el asesor responsable del cliente.' }, { status: 400 });
+    }
+    const sellerUser = sellerId === null
+      ? null
+      : await prisma.user.findUnique({
+          where: { id: sellerId },
+          select: { username: true, fullName: true },
+        });
 
-    const lastContract = await prisma.contract.findFirst({ orderBy: { id: 'desc' } });
-    const contractNum = lastContract ? lastContract.id + 1 : 1;
-    const contractNumber = `FV-${new Date().getFullYear()}-${contractNum.toString().padStart(4, '0')}`;
+    const existingUser = await prisma.user.findUnique({ where: { username: dni } });
+    if (existingUser && existingUser.role !== 'CLIENT') {
+      return NextResponse.json({ message: 'El DNI ya pertenece a una cuenta que no es de cliente.' }, { status: 409 });
+    }
+    if (existingUser && sellerId !== null && existingUser.sellerId !== null &&
+      existingUser.sellerId !== sellerId) {
+      return NextResponse.json({ message: 'El cliente ya está asignado a otro asesor.' }, { status: 409 });
+    }
+    const existingSale = await prisma.sale.findFirst({ where: { dni }, select: { id: true } });
+    if (existingSale) {
+      return NextResponse.json({ message: 'Ya existe un servicio registrado con ese DNI.' }, { status: 409 });
+    }
 
-    const sale = await prisma.sale.create({
-      data: {
-        correlativeId,
-        dni: data.dni,
-        names: data.names,
-        address: data.address,
-        phone: data.phone,
-        locationLink: data.locationLink || '',
-        installationDate: data.installationDate || null,
-        internetPlan: data.internetPlan || null,
-        details: data.details || null,
-        sellerNameOrId: data.sellerName || sellerName,
-        status: 'INSTALLED',
-        installedAt,
-        contract: {
-          create: {
-            contractNumber,
-            sellerUserId: auth.userId,
-            startDate: installedAt,
-            endDate,
-            monthlyAmount: parseFloat(data.monthlyAmount) || 0,
-            paymentDay,
-            receipts: {
-              create: [1, 2, 3].map((month) => {
-                const dueDate = new Date(installedAt);
-                dueDate.setMonth(dueDate.getMonth() + month);
-                return { monthNumber: month, dueDate, amount: parseFloat(data.monthlyAmount) || 0 };
-              }),
+    const password = await bcrypt.hash(dni, 10);
+    const startedAt = new Date();
+    const endDate = new Date(startedAt.getFullYear(), startedAt.getMonth() + 3, 1);
+    endDate.setDate(Math.min(startedAt.getDate(), new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate()));
+    const paymentDay = startedAt.getDate();
+
+    const sale = await prisma.$transaction(async (tx) => {
+      const lastSale = await tx.sale.findFirst({ orderBy: { id: 'desc' }, select: { id: true } });
+      const lastContract = await tx.contract.findFirst({ orderBy: { id: 'desc' }, select: { id: true } });
+      const clientUser = existingUser
+        ? await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              fullName: names,
+              phone,
+              ...(existingUser.sellerId === null && sellerId !== null ? { sellerId } : {}),
+            },
+          })
+        : await tx.user.create({
+            data: {
+          username: dni,
+          password,
+          role: 'CLIENT',
+          fullName: names,
+          phone,
+          sellerId,
+            },
+          });
+      const contractNumber = `FV-${startedAt.getFullYear()}-${String((lastContract?.id ?? 0) + 1).padStart(4, '0')}`;
+      const correlativeId = String((lastSale?.id ?? 0) + 1).padStart(4, '0');
+      const receipts = [1, 2, 3].map((month) => {
+        const dueDate = new Date(startedAt.getFullYear(), startedAt.getMonth() + month, 1);
+        dueDate.setDate(Math.min(paymentDay, new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate()));
+        return { monthNumber: month, dueDate, amount: monthlyAmount };
+      });
+
+      return tx.sale.create({
+        data: {
+          correlativeId,
+          clientUserId: clientUser.id,
+          sellerUserId: sellerId,
+          dni,
+          names,
+          address,
+          phone,
+          locationLink: typeof data.locationLink === 'string' ? data.locationLink.trim() : '',
+          installationDate: typeof data.installationDate === 'string' ? data.installationDate : null,
+          internetPlan: typeof data.internetPlan === 'string' ? data.internetPlan.trim() : null,
+          details: typeof data.details === 'string' ? data.details.trim() : null,
+          sellerNameOrId: sellerUser?.fullName || sellerUser?.username || auth.fullName || auth.username,
+          status: 'INSTALLED',
+          installedAt: startedAt,
+          contract: {
+            create: {
+              contractNumber,
+              clientUserId: clientUser.id,
+              sellerUserId: sellerId,
+              startDate: startedAt,
+              endDate,
+              monthlyAmount,
+              paymentDay,
+              receipts: { create: receipts },
             },
           },
         },
-      },
-      include: { contract: { include: { receipts: true } } },
+        include: {
+          contract: {
+            include: {
+              receipts: true,
+              clientUser: { select: { id: true, username: true, fullName: true } },
+            },
+          },
+        },
+      });
     });
-
-    // Crear cuenta Cliente si se proporciona DNI (usuario=DNI, pass=DNI)
-    if (data.createAccess !== false) {
-      const existing = await prisma.user.findUnique({ where: { username: data.dni } });
-      if (!existing) {
-        const bcrypt = require('bcryptjs');
-        const hashed = await bcrypt.hash(data.dni, 10);
-        const newUser = await prisma.user.create({
-          data: { username: data.dni, password: hashed, role: 'CLIENT', fullName: data.names, phone: data.phone, sellerId: auth.userId },
-        });
-        // Vincular al contrato
-        await prisma.contract.update({
-          where: { saleId: sale.id },
-          data: { clientUserId: newUser.id },
-        });
-      }
-    }
 
     return NextResponse.json(sale, { status: 201 });
   } catch (error) {

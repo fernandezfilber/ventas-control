@@ -20,8 +20,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const auth = await getAuth();
   if (!auth) return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
   const { id } = await params;
+  const saleId = Number(id);
+  if (!Number.isInteger(saleId) || saleId <= 0) {
+    return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
+  }
   const sale = await prisma.sale.findUnique({
-    where: { id: parseInt(id) },
+    where: { id: saleId },
     include: {
       contract: {
         include: {
@@ -33,6 +37,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     },
   });
   if (!sale) return NextResponse.json({ message: 'No encontrado' }, { status: 404 });
+  if (auth.role === 'CLIENT' && sale.clientUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
+  if (auth.role === 'SELLER' && sale.sellerUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
+  if (!['ADMIN', 'SELLER', 'CLIENT'].includes(auth.role)) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
   return NextResponse.json(sale);
 }
 
@@ -43,37 +56,64 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
   }
   const { id } = await params;
+  const saleId = Number(id);
+  if (!Number.isInteger(saleId) || saleId <= 0) {
+    return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
+  }
+  const existing = await prisma.sale.findUnique({ where: { id: saleId }, include: { contract: true } });
+  if (!existing) return NextResponse.json({ message: 'No encontrado' }, { status: 404 });
+  if (auth.role === 'SELLER' && existing.sellerUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
   const data = await req.json();
 
-  const updateData: Record<string, unknown> = {};
-  if (data.names !== undefined) updateData.names = data.names;
-  if (data.dni !== undefined) updateData.dni = data.dni;
-  if (data.phone !== undefined) updateData.phone = data.phone;
-  if (data.address !== undefined) updateData.address = data.address;
-  if (data.internetPlan !== undefined) updateData.internetPlan = data.internetPlan;
-  if (data.details !== undefined) updateData.details = data.details;
+  try {
+    const updateData: Record<string, unknown> = {};
+    for (const field of ['names', 'dni', 'phone', 'address', 'locationLink', 'internetPlan', 'details']) {
+      if (typeof data[field] === 'string') updateData[field] = data[field].trim();
+    }
+    if (Object.keys(updateData).length === 0 && data.monthlyAmount === undefined) {
+      return NextResponse.json({ message: 'No hay cambios para guardar' }, { status: 400 });
+    }
 
-  const updated = await prisma.sale.update({
-    where: { id: parseInt(id) },
-    data: updateData,
-    include: { contract: { include: { receipts: true } } },
-  });
+    const monthlyAmount = data.monthlyAmount === undefined
+      ? null
+      : Number(String(data.monthlyAmount).replace(',', '.'));
+    if (monthlyAmount !== null && (!Number.isFinite(monthlyAmount) || monthlyAmount <= 0)) {
+      return NextResponse.json({ message: 'El monto mensual debe ser mayor que cero' }, { status: 400 });
+    }
 
-  // Actualizar monto mensual si cambió
-  if (data.monthlyAmount && updated.contract) {
-    const amount = parseFloat(data.monthlyAmount);
-    await prisma.contract.update({
-      where: { id: updated.contract.id },
-      data: { monthlyAmount: amount },
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.sale.update({ where: { id: saleId }, data: updateData });
+      if (existing.clientUserId && (typeof updateData.names === 'string' || typeof updateData.phone === 'string')) {
+        await tx.user.update({
+          where: { id: existing.clientUserId },
+          data: {
+            ...(typeof updateData.names === 'string' ? { fullName: updateData.names } : {}),
+            ...(typeof updateData.phone === 'string' ? { phone: updateData.phone } : {}),
+          },
+        });
+      }
+      if (monthlyAmount !== null && existing.contract) {
+        await tx.contract.update({
+          where: { id: existing.contract.id },
+          data: { monthlyAmount },
+        });
+        await tx.receipt.updateMany({
+          where: { contractId: existing.contract.id, status: 'PENDING' },
+          data: { amount: monthlyAmount },
+        });
+      }
+      return tx.sale.findUnique({
+        where: { id: saleId },
+        include: { contract: { include: { receipts: true } } },
+      });
     });
-    // Actualizar recibos pendientes
-    await prisma.receipt.updateMany({
-      where: { contractId: updated.contract.id, status: 'PENDING' },
-      data: { amount },
-    });
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Error updating client:', error);
+    return NextResponse.json({ message: 'Error al actualizar cliente' }, { status: 500 });
   }
-
-  return NextResponse.json(updated);
 }
 
 // DELETE — eliminar cliente
@@ -83,16 +123,30 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
   }
   const { id } = await params;
-  const saleId = parseInt(id);
-
-  const sale = await prisma.sale.findUnique({ where: { id: saleId }, include: { contract: true } });
-  if (!sale) return NextResponse.json({ message: 'No encontrado' }, { status: 404 });
-
-  if (sale.contract) {
-    await prisma.receipt.deleteMany({ where: { contractId: sale.contract.id } });
-    await prisma.contract.delete({ where: { id: sale.contract.id } });
+  const saleId = Number(id);
+  if (!Number.isInteger(saleId) || saleId <= 0) {
+    return NextResponse.json({ message: 'ID inválido' }, { status: 400 });
   }
-  await prisma.sale.delete({ where: { id: saleId } });
+
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: { contract: { include: { receipts: { select: { status: true } } } } },
+  });
+  if (!sale) return NextResponse.json({ message: 'No encontrado' }, { status: 404 });
+  if (auth.role === 'SELLER' && sale.sellerUserId !== auth.userId) {
+    return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
+  }
+  if (sale.contract?.receipts.some((receipt) => receipt.status === 'PAID')) {
+    return NextResponse.json({ message: 'No se puede eliminar un cliente con pagos confirmados; conserva su historial.' }, { status: 409 });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (sale.contract) {
+      await tx.receipt.deleteMany({ where: { contractId: sale.contract.id } });
+      await tx.contract.delete({ where: { id: sale.contract.id } });
+    }
+    await tx.sale.delete({ where: { id: saleId } });
+  });
 
   return NextResponse.json({ message: 'Cliente eliminado' });
 }

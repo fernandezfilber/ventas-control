@@ -95,13 +95,10 @@ export async function PUT(
     }
   }
   if (data.reminderMode !== undefined) {
-    if (!['MANUAL', 'AUTOMATIC'].includes(data.reminderMode)) {
-      return NextResponse.json({ message: 'Modo de recordatorio inválido' }, { status: 400 });
+    if (data.reminderMode !== 'MANUAL') {
+      return NextResponse.json({ message: 'Los recordatorios automáticos no están habilitados. Usa el envío manual por WhatsApp.' }, { status: 400 });
     }
-    if (data.reminderMode === 'AUTOMATIC' && !existingContract.clientUser?.whatsappRemindersEnabled) {
-      return NextResponse.json({ message: 'El cliente debe aceptar primero los recordatorios por WhatsApp' }, { status: 400 });
-    }
-    updateData.reminderMode = data.reminderMode;
+    updateData.reminderMode = 'MANUAL';
   }
 
   const contract = await prisma.contract.update({

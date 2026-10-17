@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import jsPDF from "jspdf";
 import { FiDownload, FiCheck, FiX } from "react-icons/fi";
+import { downloadServiceContractPdf } from "@/lib/contract-pdf";
 
 interface Contract {
   id: number;
@@ -10,7 +10,10 @@ interface Contract {
   startDate: string;
   endDate: string;
   monthlyAmount: number;
+  paymentDay: number;
   status: string;
+  clientSignedAt: string | null;
+  sellerSignedAt: string | null;
   clientSignature: string | null;
   sellerSignature: string | null;
   sale: {
@@ -18,8 +21,9 @@ interface Contract {
     dni: string;
     address: string;
     phone: string;
-    internetPlan: string;
+    internetPlan: string | null;
   };
+  receipts: { monthNumber: number; dueDate: string; amount: number }[];
 }
 
 export default function ClientContract() {
@@ -119,60 +123,7 @@ export default function ClientContract() {
 
   const downloadPDF = () => {
     if (!contract) return;
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(30, 64, 175); // FV Blue
-    doc.text("ForwardVision", 105, 20, { align: "center" });
-    
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
-    doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS", 105, 30, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.text(`Contrato N°: ${contract.contractNumber}`, 20, 45);
-    doc.text(`Fecha de Inicio: ${new Date(contract.startDate).toLocaleDateString()}`, 20, 52);
-    doc.text(`Fecha de Vencimiento: ${new Date(contract.endDate).toLocaleDateString()}`, 20, 59);
-    
-    // Client Info
-    doc.setFontSize(12);
-    doc.text("1. DATOS DEL CLIENTE", 20, 75);
-    doc.setFontSize(10);
-    doc.text(`Nombre/Razón Social: ${contract.sale.names}`, 20, 85);
-    doc.text(`DNI/RUC: ${contract.sale.dni}`, 20, 92);
-    doc.text(`Dirección: ${contract.sale.address}`, 20, 99);
-    doc.text(`Teléfono: ${contract.sale.phone}`, 20, 106);
-    
-    // Service Info
-    doc.setFontSize(12);
-    doc.text("2. DETALLES DEL SERVICIO", 20, 120);
-    doc.setFontSize(10);
-    doc.text(`Plan Contratado: ${contract.sale.internetPlan}`, 20, 130);
-    doc.text(`Monto Mensual: S/ ${contract.monthlyAmount.toFixed(2)}`, 20, 137);
-    doc.text(`Periodo Forzoso: 3 Meses`, 20, 144);
-    
-    // Terms
-    doc.setFontSize(12);
-    doc.text("3. TÉRMINOS Y CONDICIONES", 20, 160);
-    doc.setFontSize(9);
-    const terms = "El cliente se compromete a mantener el servicio por un periodo mínimo de 3 meses. El pago deberá realizarse los días indicados en su cronograma de pagos. En caso de incumplimiento, ForwardVision se reserva el derecho de suspender el servicio.";
-    const splitTerms = doc.splitTextToSize(terms, 170);
-    doc.text(splitTerms, 20, 170);
-    
-    // Signatures
-    doc.setFontSize(10);
-    doc.text("LA EMPRESA", 50, 230, { align: "center" });
-    doc.text("EL CLIENTE", 160, 230, { align: "center" });
-    
-    if (contract.sellerSignature) {
-      doc.addImage(contract.sellerSignature, "PNG", 30, 200, 40, 20);
-    }
-    if (contract.clientSignature) {
-      doc.addImage(contract.clientSignature, "PNG", 140, 200, 40, 20);
-    }
-    
-    doc.save(`Contrato_${contract.contractNumber}.pdf`);
+    downloadServiceContractPdf(contract);
   };
 
   if (loading) return <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>;
@@ -210,8 +161,15 @@ export default function ClientContract() {
             </div>
           </div>
           
-          <div style={{ fontSize: "0.85rem", color: "#cbd5e1", lineHeight: 1.5, padding: "12px", background: "rgba(255,255,255,.03)", borderRadius: "8px", marginTop: "20px" }}>
-            El presente contrato tiene una duración forzosa de 3 meses a partir de su instalación. Usted acepta las condiciones del servicio de ForwardVision.
+          <div style={{ fontSize: "0.85rem", color: "#cbd5e1", lineHeight: 1.6, padding: "12px", background: "rgba(255,255,255,.03)", borderRadius: "8px", marginTop: "20px" }}>
+            <strong>Cancelación anticipada:</strong> cargo informado de S/ 100.00 antes de completar los 3 meses.
+            <br />
+            <strong>Materiales:</strong> el cliente asume reparaciones comprobables por daños causados por uso indebido o negligencia.
+            <br />
+            <span style={{ display: "block", marginTop: 8 }}>ForwardVision · +51 955 318 590</span>
+            <span style={{ display: "block", marginTop: 8, color: "#fbbf24" }}>
+              Borrador: falta incorporar RUC, domicilio legal y logo antes de usar como contrato definitivo.
+            </span>
           </div>
         </div>
       </div>

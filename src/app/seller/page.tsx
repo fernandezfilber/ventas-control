@@ -3,36 +3,68 @@
 import { useEffect, useState } from "react";
 import { FiTrendingUp, FiUsers, FiMessageCircle } from "react-icons/fi";
 
-type ContractSummary = { status: string; receipts: { status: string }[] };
+type ContractSummary = {
+  status: string;
+  createdAt: string;
+  receipts: { status: string; dueDate: string }[];
+};
 
 export default function SellerDashboard() {
   const [stats, setStats] = useState({ totalClients: 0, activeContracts: 0, pendingReminders: 0 });
   const [timeframe, setTimeframe] = useState("mes");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    // In a real app we'd pass timeframe to API. Doing a simple fetch here.
+    let active = true;
+    setLoading(true);
     fetch("/api/contracts")
-      .then((res) => res.json())
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "No se pudieron cargar las ventas.");
+        return data as ContractSummary[];
+      })
       .then((contracts) => {
-        let pendingReminders = 0;
-        let active = 0;
-        
-        contracts.forEach((c: ContractSummary) => {
-          if (c.status === "ACTIVE") active++;
-          c.receipts.forEach((r) => {
-            if (r.status !== "PAID") pendingReminders++;
-          });
-        });
+        const now = new Date();
+        const start = new Date(now);
+        if (timeframe === "dia") {
+          start.setHours(0, 0, 0, 0);
+        } else if (timeframe === "semana") {
+          start.setDate(start.getDate() - 6);
+          start.setHours(0, 0, 0, 0);
+        } else {
+          start.setDate(1);
+          start.setHours(0, 0, 0, 0);
+        }
+        const periodContracts = contracts.filter((contract) => new Date(contract.createdAt) >= start);
+        const pendingReminders = periodContracts.reduce((count, contract) => {
+          const reminderLimit = new Date();
+          reminderLimit.setDate(reminderLimit.getDate() + 5);
+          return count + contract.receipts.filter((receipt) =>
+            receipt.status !== "PAID" && new Date(receipt.dueDate) <= reminderLimit
+          ).length;
+        }, 0);
+        const activeContracts = periodContracts.filter((contract) => contract.status === "ACTIVE").length;
 
+        if (!active) return;
         setStats({
-          totalClients: contracts.length,
-          activeContracts: active,
+          totalClients: periodContracts.length,
+          activeContracts,
           pendingReminders,
         });
-        setLoading(false);
+        setError("");
       })
-      .catch(() => setLoading(false));
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(cause instanceof Error ? cause.message : "No se pudieron cargar las ventas.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [timeframe]);
 
   return (
@@ -55,6 +87,8 @@ export default function SellerDashboard() {
       {loading ? (
         <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" style={{ borderTopColor: "var(--fv-blue)" }} /></div>
       ) : (
+        <>
+        {error && <div role="alert" className="card" style={{ color: "var(--fv-red)" }}>{error}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
           <div className="stat-card blue">
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
@@ -81,11 +115,12 @@ export default function SellerDashboard() {
               <div style={{ background: "rgba(245,158,11,.1)", padding: "8px", borderRadius: "10px", color: "var(--fv-gold)" }}>
                 <FiMessageCircle size={20} />
               </div>
-              <div style={{ fontSize: "0.85rem", color: "var(--text-light)", fontWeight: 600 }}>Pagos pendientes de recordatorio</div>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-light)", fontWeight: 600 }}>Pagos vencidos o por vencer en 5 días</div>
             </div>
             <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "var(--fv-navy)" }}>{stats.pendingReminders}</div>
           </div>
         </div>
+        </>
       )}
     </div>
   );

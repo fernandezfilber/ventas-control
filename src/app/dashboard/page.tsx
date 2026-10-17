@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import jsPDF from "jspdf";
 
 type Sale = {
   id: number;
@@ -11,13 +12,13 @@ type Sale = {
   address: string;
   phone: string;
   locationLink: string;
-  referencePhotos: string;
   installationDate: string | null;
   installationTimeRange: string | null;
   internetPlan: string | null;
   details: string | null;
   status: string;
   sellerNameOrId: string;
+  contract: { monthlyAmount: number } | null;
   installedAt: string | null;
   createdAt: string;
 };
@@ -42,6 +43,7 @@ export default function DashboardVentas() {
   const [loading, setLoading] = useState(true);
   const [filterDni, setFilterDni] = useState("");
   const [filterDate, setFilterDate] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
   const fetchSales = async () => {
@@ -50,6 +52,7 @@ export default function DashboardVentas() {
       let url = "/api/sales?";
       if (filterDni) url += `dni=${filterDni}&`;
       if (filterDate) url += `date=${filterDate}&`;
+      if (filterMonth) url += `month=${filterMonth}&`;
       if (filterStatus) url += `status=${filterStatus}`;
       const res = await fetch(url);
       const data = await res.json();
@@ -63,7 +66,34 @@ export default function DashboardVentas() {
 
   useEffect(() => {
     fetchSales();
-  }, [filterDni, filterDate, filterStatus]);
+  }, [filterDni, filterDate, filterMonth, filterStatus]);
+
+  const downloadSalesPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.setTextColor(30, 64, 175);
+    doc.text("ForwardVision", 14, 18);
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Reporte de ventas${filterMonth ? ` - ${filterMonth}` : filterDate ? ` - ${filterDate}` : ""}`, 14, 28);
+    doc.setFontSize(9);
+
+    let y = 40;
+    sales.forEach((sale, index) => {
+      const lines = doc.splitTextToSize(
+        `${index + 1}. ${sale.names} | DNI ${sale.dni} | ${sale.sellerNameOrId}\n` +
+        `${new Date(sale.createdAt).toLocaleDateString("es-PE")} | ${sale.internetPlan || "Sin plan"} | ${sale.status} | S/ ${sale.contract?.monthlyAmount.toFixed(2) ?? "0.00"}/mes`,
+        180
+      );
+      if (y + lines.length * 5 > 280) {
+        doc.addPage();
+        y = 18;
+      }
+      doc.text(lines, 14, y);
+      y += lines.length * 5 + 4;
+    });
+    doc.save(`Ventas_${filterMonth || filterDate || "todas"}.pdf`);
+  };
 
   const handleMarkInstalled = async (sale: Sale) => {
     const clientId = prompt('Ingrese el ID de Cliente (código de caja):', sale.clientId || '');
@@ -119,12 +149,16 @@ export default function DashboardVentas() {
     const created = new Date(s.createdAt); created.setHours(0,0,0,0);
     return created.getTime() < today.getTime();
   }).length;
+  const monthlyRevenue = sales.reduce((total, sale) => total + (sale.contract?.monthlyAmount || 0), 0);
 
   // Group sales by seller
   const salesBySeller = sales.reduce((acc, sale) => {
-    acc[sale.sellerNameOrId] = (acc[sale.sellerNameOrId] || 0) + 1;
+    const seller = acc[sale.sellerNameOrId] || { count: 0, monthlyRevenue: 0 };
+    seller.count += 1;
+    seller.monthlyRevenue += sale.contract?.monthlyAmount || 0;
+    acc[sale.sellerNameOrId] = seller;
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { count: number; monthlyRevenue: number }>);
 
   return (
     <div>
@@ -144,15 +178,20 @@ export default function DashboardVentas() {
           <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ad6800' }}>{overdue}</div>
           <div style={{ fontSize: '0.85rem', color: '#ad6800' }}>⚠️ Vencidas</div>
         </div>
+        <div className="card" style={{ flex: 1, minWidth: '180px', background: '#e0f2fe', borderLeft: '4px solid #06b6d4', padding: '15px' }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#0f1b3d' }}>S/ {monthlyRevenue.toFixed(2)}</div>
+          <div style={{ fontSize: '0.85rem', color: '#0f1b3d' }}>Mensualidades de ventas listadas</div>
+        </div>
       </div>
 
       {/* Sales by Seller */}
       <h3 style={{ marginBottom: '16px', color: 'var(--fv-navy)', fontSize: '1.2rem' }}>Rendimiento por Asesor</h3>
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {Object.entries(salesBySeller).sort((a, b) => b[1] - a[1]).map(([seller, count]) => (
+        {Object.entries(salesBySeller).sort((a, b) => b[1].count - a[1].count).map(([seller, totals]) => (
           <div key={seller} className="card" style={{ flex: '1 1 200px', background: '#fff', borderLeft: '4px solid var(--fv-blue)', padding: '15px' }}>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--fv-navy)' }}>{count}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--fv-navy)' }}>{totals.count} ventas</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: 600 }}>{seller}</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--fv-green-dark)', marginTop: 6 }}>S/ {totals.monthlyRevenue.toFixed(2)} / mes</div>
           </div>
         ))}
         {Object.keys(salesBySeller).length === 0 && (
@@ -168,7 +207,11 @@ export default function DashboardVentas() {
         </div>
         <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '150px' }}>
           <label>Filtrar por Fecha</label>
-          <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
+          <input type="date" value={filterDate} onChange={(e) => { setFilterDate(e.target.value); if (e.target.value) setFilterMonth(""); }} />
+        </div>
+        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '150px' }}>
+          <label>Filtrar por Mes</label>
+          <input type="month" value={filterMonth} onChange={(e) => { setFilterMonth(e.target.value); if (e.target.value) setFilterDate(""); }} />
         </div>
         <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '150px' }}>
           <label>Estado</label>
@@ -179,6 +222,7 @@ export default function DashboardVentas() {
           </select>
         </div>
         <button className="btn-primary" onClick={fetchSales} style={{ width: 'auto' }}>🔄 Actualizar</button>
+        <button className="btn-outline" onClick={downloadSalesPdf} disabled={!sales.length} style={{ whiteSpace: "nowrap" }}>Descargar PDF</button>
       </div>
 
       {/* Table */}

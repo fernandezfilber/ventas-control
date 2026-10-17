@@ -56,18 +56,20 @@ export async function POST(req: Request) {
   try {
     const { username, password, role, fullName, phone, sellerId } = await req.json();
 
-    if (!username || !password || !role) {
-      return NextResponse.json({ message: 'Faltan campos requeridos' }, { status: 400 });
+    if (typeof username !== 'string' || !username.trim() ||
+      typeof password !== 'string' || password.length < 8 ||
+      typeof role !== 'string') {
+      return NextResponse.json({ message: 'El usuario y la contraseña son requeridos; la contraseña debe tener al menos 8 caracteres.' }, { status: 400 });
     }
 
     if (auth.role === 'SELLER' && role !== 'CLIENT') {
       return NextResponse.json({ message: 'Los asesores solo pueden crear cuentas de clientes' }, { status: 403 });
     }
-    if (auth.role === 'ADMIN' && !['ADMIN', 'SELLER', 'CLIENT', 'TECHNICIAN'].includes(role)) {
-      return NextResponse.json({ message: 'Rol inválido' }, { status: 400 });
+    if (auth.role === 'ADMIN' && role !== 'SELLER') {
+      return NextResponse.json({ message: 'El administrador solo puede crear cuentas de asesores' }, { status: 403 });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { username } });
+    const existingUser = await prisma.user.findUnique({ where: { username: username.trim() } });
     if (existingUser) {
       return NextResponse.json({ message: 'El usuario ya existe' }, { status: 409 });
     }
@@ -76,7 +78,7 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.create({
       data: {
-        username,
+        username: username.trim(),
         password: hashedPassword,
         role,
         fullName: fullName || null,

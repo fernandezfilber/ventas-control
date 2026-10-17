@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiHome, FiUsers, FiDollarSign, FiMessageSquare, FiSettings, FiLogOut } from "react-icons/fi";
+import { FiHome, FiUsers, FiUserPlus, FiSettings, FiLogOut } from "react-icons/fi";
 
 const NAV = [
   { href: "/seller", label: "Inicio", icon: <FiHome size={22} /> },
   { href: "/seller/clientes", label: "Clientes", icon: <FiUsers size={22} /> },
-  { href: "/seller/pagos", label: "Pagos", icon: <FiDollarSign size={22} /> },
-  { href: "/seller/recordatorios", label: "WA", icon: <FiMessageSquare size={22} /> },
+  { href: "/seller/clientes/nuevo", label: "Agregar", icon: <FiUserPlus size={22} /> },
   { href: "/perfil", label: "Perfil", icon: <FiSettings size={22} /> },
 ];
 
