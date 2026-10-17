@@ -11,47 +11,29 @@ model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
   password  String
-  role      String   @default("TECHNICIAN")
+  role      String   @default("SELLER")   // ADMIN | SELLER | CLIENT
   fullName  String?
   phone     String?
-  sellerId  Int?
-  whatsappRemindersEnabled Boolean @default(false)
+  sellerId  Int?     // Para clientes: ID del asesor asignado
   createdAt DateTime @default(now())
 
   clientContracts Contract[] @relation("ClientContracts")
   sellerContracts Contract[] @relation("SellerContracts")
-  sales           Sale[]     @relation("SellerSales")
-  clientSales     Sale[]     @relation("ClientSales")
-}
-
-model Employee {
-  id           Int      @id @default(autoincrement())
-  name         String
-  dni          String   @unique
-  passwordHash String?
-  status       String   @default("PENDING")
-  createdAt    DateTime @default(now())
 }
 
 model Sale {
   id                    Int       @id @default(autoincrement())
   correlativeId         String    @unique
-  clientId              String?
-  sellerUserId          Int?
-  sellerUser            User?     @relation("SellerSales", fields: [sellerUserId], references: [id])
-  clientUserId           Int?
-  clientUser             User?     @relation("ClientSales", fields: [clientUserId], references: [id])
+  clientId              String?   // código interno de caja
   dni                   String
   names                 String
   address               String
   phone                 String
   locationLink          String    @db.Text
-  referencePhotos       String    @db.LongText
   installationDate      String?
-  installationTimeRange String?
   internetPlan          String?
   details               String?   @db.Text
-  status                String    @default("PENDING")
+  status                String    @default("PENDING")   // PENDING | INSTALLED
   sellerNameOrId        String
   installedAt           DateTime?
   createdAt             DateTime  @default(now())
@@ -72,8 +54,7 @@ model Contract {
   startDate       DateTime
   endDate         DateTime
   monthlyAmount   Float     @default(0)
-  reminderMode    String    @default("MANUAL")
-  status          String    @default("PENDING_SIGNATURE")
+  status          String    @default("PENDING_SIGNATURE") // PENDING_SIGNATURE | ACTIVE | CANCELLED | EXPIRED
   clientSignedAt  DateTime?
   sellerSignedAt  DateTime?
   clientSignature String?   @db.LongText
@@ -86,25 +67,15 @@ model Contract {
 }
 
 model Receipt {
-  id          Int      @id @default(autoincrement())
-  contractId  Int
-  contract    Contract @relation(fields: [contractId], references: [id])
-  monthNumber Int
-  dueDate     DateTime
-  paidAt      DateTime?
-  amount      Float
-  status      String   @default("PENDING")
-  lastReminderAt DateTime?
-  createdAt   DateTime @default(now())
-}
-
-model Attendance {
-  id         Int      @id @default(autoincrement())
-  employeeId Int?
-  userName   String
-  dni        String?
-  photoUrl   String   @db.LongText
-  latitude   Float
-  longitude  Float
-  createdAt  DateTime @default(now())
+  id                  Int       @id @default(autoincrement())
+  contractId          Int
+  contract            Contract  @relation(fields: [contractId], references: [id])
+  monthNumber         Int       // 1, 2, 3
+  dueDate             DateTime
+  paidAt              DateTime?
+  amount              Float
+  status              String    @default("PENDING") // PENDING | PAID | OVERDUE
+  reminderLastSentAt  DateTime?
+  reminderCount       Int       @default(0)
+  createdAt           DateTime  @default(now())
 }

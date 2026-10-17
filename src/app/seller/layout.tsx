@@ -2,50 +2,80 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FiPieChart, FiUsers, FiLogOut, FiLock } from "react-icons/fi";
+import { FiHome, FiUsers, FiDollarSign, FiMessageSquare, FiSettings, FiLogOut } from "react-icons/fi";
+
+const NAV = [
+  { href: "/seller", label: "Inicio", icon: <FiHome size={22} /> },
+  { href: "/seller/clientes", label: "Clientes", icon: <FiUsers size={22} /> },
+  { href: "/seller/pagos", label: "Pagos", icon: <FiDollarSign size={22} /> },
+  { href: "/seller/recordatorios", label: "WA", icon: <FiMessageSquare size={22} /> },
+  { href: "/perfil", label: "Perfil", icon: <FiSettings size={22} /> },
+];
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.push("/login");
-      router.refresh();
-    } catch {
-      alert("Error al cerrar sesión");
-    }
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
   };
 
-  const navItems = [
-    { href: "/seller", label: "Métricas", icon: <FiPieChart className="nav-icon" /> },
-    { href: "/seller/clientes", label: "Mis Clientes", icon: <FiUsers className="nav-icon" /> },
-    { href: "/perfil", label: "Contraseña", icon: <FiLock className="nav-icon" /> },
-  ];
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <main style={{ flex: 1, padding: "20px", paddingBottom: "90px", maxWidth: "800px", margin: "0 auto", width: "100%" }}>
+    <div style={{ minHeight: "100vh", background: "#f8fafc", paddingBottom: "80px" }}>
+      {/* Top bar */}
+      <div style={{
+        background: "linear-gradient(135deg, #0f1b3d, #1e40af)",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 16px",
+        height: "52px",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        boxShadow: "0 2px 8px rgba(0,0,0,.25)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", fontWeight: 800, fontSize: ".95rem" }}>
+          <div style={{ background: "linear-gradient(135deg,#06b6d4,#10b981)", width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: ".8rem" }}>FV</div>
+          ForwardVision
+        </div>
+        <button onClick={logout} style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", cursor: "pointer", fontSize: ".8rem", display: "flex", alignItems: "center", gap: "4px" }}>
+          <FiLogOut size={16} /> Salir
+        </button>
+      </div>
+
+      {/* Content */}
+      <main style={{ maxWidth: "700px", margin: "0 auto", padding: "16px" }}>
         {children}
       </main>
 
-      <nav className="bottom-nav" style={{ display: "flex", background: "#fff", borderTop: "1px solid #e2e8f0" }}>
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`bottom-nav-item ${pathname === item.href ? "active" : ""}`}
-            style={{ color: pathname === item.href ? "var(--fv-blue)" : "#64748b" }}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </Link>
-        ))}
-        <button onClick={handleLogout} className="bottom-nav-item" style={{ color: "#ef4444" }}>
-          <FiLogOut className="nav-icon" />
-          <span>Salir</span>
-        </button>
+      {/* Bottom Nav */}
+      <nav style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: "#fff",
+        borderTop: "1px solid #e2e8f0",
+        display: "flex",
+        justifyContent: "space-around",
+        padding: "6px 0 calc(6px + env(safe-area-inset-bottom))",
+        zIndex: 100,
+        boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
+      }}>
+        {NAV.map(item => {
+          const active = pathname === item.href || (item.href !== "/seller" && pathname.startsWith(item.href));
+          return (
+            <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", color: active ? "#1e40af" : "#94a3b8", fontSize: ".65rem", fontWeight: active ? 700 : 500, minWidth: "56px", padding: "4px 0" }}>
+                <div style={{ color: active ? "#1e40af" : "#94a3b8" }}>{item.icon}</div>
+                {item.label}
+              </div>
+            </Link>
+          );
+        })}
       </nav>
     </div>
   );
