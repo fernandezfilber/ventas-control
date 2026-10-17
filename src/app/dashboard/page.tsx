@@ -45,28 +45,36 @@ export default function DashboardVentas() {
   const [filterDate, setFilterDate] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-
-  const fetchSales = async () => {
-    setLoading(true);
-    try {
-      let url = "/api/sales?";
-      if (filterDni) url += `dni=${filterDni}&`;
-      if (filterDate) url += `date=${filterDate}&`;
-      if (filterMonth) url += `month=${filterMonth}&`;
-      if (filterStatus) url += `status=${filterStatus}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setSales(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    fetchSales();
-  }, [filterDni, filterDate, filterMonth, filterStatus]);
+    let active = true;
+    const params = new URLSearchParams();
+    if (filterDni) params.set("dni", filterDni);
+    if (filterDate) params.set("date", filterDate);
+    if (filterMonth) params.set("month", filterMonth);
+    if (filterStatus) params.set("status", filterStatus);
+
+    fetch(`/api/sales?${params.toString()}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "No se pudieron cargar las ventas.");
+        return data as Sale[];
+      })
+      .then((data) => {
+        if (active) setSales(data);
+      })
+      .catch((error: unknown) => {
+        if (active) console.error(error);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [filterDni, filterDate, filterMonth, filterStatus, refreshKey]);
 
   const downloadSalesPdf = () => {
     const doc = new jsPDF();
@@ -113,7 +121,7 @@ export default function DashboardVentas() {
         body: JSON.stringify({ status: 'INSTALLED', clientId: clientId || null, monthlyAmount }),
       });
       if (!res.ok) throw new Error('Error al confirmar la instalación');
-      fetchSales();
+      setRefreshKey((current) => current + 1);
     } catch (e) {
       console.error(e);
       alert('Error al actualizar estado');
@@ -128,7 +136,7 @@ export default function DashboardVentas() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'PENDING' }),
       });
-      fetchSales();
+      setRefreshKey((current) => current + 1);
     } catch (e) {
       console.error(e);
       alert('Error al actualizar estado');
@@ -221,7 +229,7 @@ export default function DashboardVentas() {
             <option value="INSTALLED">Instalada</option>
           </select>
         </div>
-        <button className="btn-primary" onClick={fetchSales} style={{ width: 'auto' }}>🔄 Actualizar</button>
+        <button className="btn-primary" onClick={() => setRefreshKey((current) => current + 1)} style={{ width: 'auto' }}>🔄 Actualizar</button>
         <button className="btn-outline" onClick={downloadSalesPdf} disabled={!sales.length} style={{ whiteSpace: "nowrap" }}>Descargar PDF</button>
       </div>
 

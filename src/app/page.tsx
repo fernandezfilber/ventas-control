@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FiFileText, FiUsers, FiDollarSign, FiMessageSquare, FiDownload, FiShield, FiArrowRight, FiCheckCircle } from "react-icons/fi";
+import { FiFileText, FiDollarSign, FiMessageSquare, FiDownload, FiShield, FiArrowRight, FiCheckCircle } from "react-icons/fi";
 
 export default function LandingPage() {
   return (

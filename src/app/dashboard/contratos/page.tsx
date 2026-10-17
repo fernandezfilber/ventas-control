@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FiFileText, FiCheck, FiSearch } from "react-icons/fi";
+import { FiCheck, FiSearch } from "react-icons/fi";
+
+interface AdminContract {
+  id: number;
+  contractNumber: string;
+  startDate: string;
+  status: string;
+  sale: { names: string; dni: string };
+  sellerUser: { fullName: string | null; username: string } | null;
+  receipts: { id: number; status: string }[];
+}
 
 export default function AdminContracts() {
-  const [contracts, setContracts] = useState<any[]>([]);
+  const [contracts, setContracts] = useState<AdminContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
@@ -59,7 +69,7 @@ export default function AdminContracts() {
                 <tr><td colSpan={6} style={{ textAlign: "center", padding: "20px", color: "var(--text-light)" }}>No se encontraron contratos</td></tr>
               ) : (
                 filtered.map((c) => {
-                  const paid = c.receipts.filter((r: any) => r.status === "PAID").length;
+                  const paid = c.receipts.filter((r) => r.status === "PAID").length;
                   const total = c.receipts.length;
                   return (
                     <tr key={c.id}>

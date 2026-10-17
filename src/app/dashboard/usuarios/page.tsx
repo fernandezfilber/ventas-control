@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FiUserPlus, FiUsers, FiX } from "react-icons/fi";
+import { FiUserPlus, FiX } from "react-icons/fi";
+
+interface Advisor {
+  id: number;
+  username: string;
+  role: string;
+  fullName: string | null;
+  createdAt: string;
+}
 
 export default function AdminUsers() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<Advisor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -17,18 +26,35 @@ export default function AdminUsers() {
   });
 
   useEffect(() => {
-    fetchUsers();
+    let active = true;
+    fetch("/api/users?role=SELLER")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "No se pudieron cargar los asesores.");
+        return data as Advisor[];
+      })
+      .then((data) => {
+        if (!active) return;
+        setUsers(data);
+        setError("");
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "No se pudieron cargar los asesores.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const fetchUsers = () => {
-    setLoading(true);
-    fetch("/api/users?role=SELLER")
-      .then((res) => res.json())
-      .then((data) => {
-        setUsers(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+  const fetchUsers = async () => {
+    const response = await fetch("/api/users?role=SELLER");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "No se pudieron cargar los asesores.");
+    setUsers(data);
+    setError("");
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -50,7 +76,7 @@ export default function AdminUsers() {
         alert("Usuario creado exitosamente.");
         setShowModal(false);
         setNewUser({ username: "", password: "", fullName: "", role: "SELLER" });
-        fetchUsers();
+        await fetchUsers();
       } else {
         const err = await res.json();
         alert(`Error: ${err.message}`);
@@ -72,6 +98,7 @@ export default function AdminUsers() {
       </div>
 
       <div className="card" style={{ overflowX: "auto" }}>
+        {error && <p role="alert" style={{ color: "var(--fv-red)", marginBottom: 12 }}>{error}</p>}
         <table className="fv-table">
           <thead>
             <tr>

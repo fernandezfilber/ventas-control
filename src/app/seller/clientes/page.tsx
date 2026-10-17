@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
@@ -46,8 +46,7 @@ export default function SellerClients() {
   const [importResult, setImportResult] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const loadClients = useCallback(async () => {
-    setLoading(true);
+  const loadClients = async () => {
     try {
       const query = month === "all" ? "" : `?month=${encodeURIComponent(month)}`;
       const response = await fetch(`/api/clients${query}`);
@@ -60,11 +59,34 @@ export default function SellerClients() {
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  };
 
   useEffect(() => {
-    void loadClients();
-  }, [loadClients]);
+    let active = true;
+    const query = month === "all" ? "" : `?month=${encodeURIComponent(month)}`;
+    fetch(`/api/clients${query}`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "No se pudieron cargar los clientes.");
+        return data as ClientRecord[];
+      })
+      .then((data) => {
+        if (!active) return;
+        setClients(data);
+        setImportResult("");
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setImportResult(error instanceof Error ? error.message : "Error al cargar clientes.");
+        setClients([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [month]);
 
   const filtered = clients.filter((client) =>
     client.names.toLowerCase().includes(search.toLowerCase()) ||
@@ -188,7 +210,7 @@ export default function SellerClients() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nombre, DNI o contrato" aria-label="Buscar clientes" style={{ width: "100%", padding: "12px 12px 12px 38px", border: "1px solid var(--border-color)", borderRadius: 10 }} />
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <input aria-label="Filtrar ventas por mes" type="month" value={month === "all" ? "" : month} onChange={(event) => setMonth(event.target.value || currentMonth())} style={{ minWidth: 0, flex: 1, padding: 11, border: "1px solid var(--border-color)", borderRadius: 10, background: "#fff" }} />
+          <input aria-label="Filtrar ventas por mes" type="month" value={month === "all" ? "" : month} onChange={(event) => { setLoading(true); setMonth(event.target.value || currentMonth()); }} style={{ minWidth: 0, flex: 1, padding: 11, border: "1px solid var(--border-color)", borderRadius: 10, background: "#fff" }} />
           <button type="button" className="btn-outline" onClick={() => setMonth("all")} style={{ whiteSpace: "nowrap", padding: "8px 10px" }}>Todos</button>
         </div>
       </div>

@@ -17,7 +17,6 @@ export default function SellerDashboard() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     fetch("/api/contracts")
       .then(async (res) => {
         const data = await res.json();
@@ -75,7 +74,7 @@ export default function SellerDashboard() {
         {["dia", "semana", "mes"].map((t) => (
           <button
             key={t}
-            onClick={() => setTimeframe(t)}
+            onClick={() => { setLoading(true); setTimeframe(t); }}
             className={`tab-btn ${timeframe === t ? "active" : ""}`}
             style={{ textTransform: "capitalize" }}
           >
