@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { readJsonResponse } from "@/lib/http";
 
 const ROLE_ROUTES: Record<string, string> = {
   ADMIN: "/dashboard",
@@ -30,16 +31,16 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = (await readJsonResponse<{ user?: { role?: string } }>(res)) ?? {};
         const requestedRoute = new URLSearchParams(window.location.search).get("next");
         const route = requestedRoute?.startsWith("/") && !requestedRoute.startsWith("//")
           ? requestedRoute
-          : ROLE_ROUTES[data.user?.role] || "/dashboard";
+          : ROLE_ROUTES[data.user?.role || ""] || "/dashboard";
         router.push(route);
         router.refresh();
       } else {
-        const data = await res.json();
-        setError(data.message || "Error al iniciar sesión");
+        const data = (await readJsonResponse<{ message?: string }>(res)) ?? {};
+        setError(data.message || "Credenciales inválidas");
       }
     } catch {
       setError("Error de conexión");

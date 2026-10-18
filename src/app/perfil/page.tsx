@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiLock } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -32,8 +33,8 @@ export default function ProfilePage() {
         setData({ currentPassword: "", newPassword: "", confirmPassword: "" });
         router.back();
       } else {
-        const err = await res.json();
-        alert(`Error: ${err.message}`);
+        const err = (await readJsonResponse<{ message?: string }>(res)) ?? {};
+        alert(`Error: ${err.message || "No se pudo actualizar la contraseña."}`);
       }
     } catch {
       alert("Error de red");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readJsonResponse } from "@/lib/http";
 import "./globals.css";
 
 interface UserInfo {
@@ -21,7 +22,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     fetch("/api/users/me")
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        const data = await readJsonResponse<UserInfo>(r);
+        return r.ok ? data : null;
+      })
       .then((data) => data && setUser(data))
       .catch(() => null);
   }, []);

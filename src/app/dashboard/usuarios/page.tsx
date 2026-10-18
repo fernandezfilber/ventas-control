@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FiUserPlus, FiX } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 interface Advisor {
   id: number;
@@ -29,9 +30,14 @@ export default function AdminUsers() {
     let active = true;
     fetch("/api/users?role=SELLER")
       .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "No se pudieron cargar los asesores.");
-        return data as Advisor[];
+        const data = await readJsonResponse<Advisor[]>(response);
+        if (!response.ok) {
+          const message = data && typeof data === "object" && "message" in data && typeof (data as { message?: string }).message === "string"
+            ? (data as { message?: string }).message
+            : "No se pudieron cargar los asesores.";
+          throw new Error(message);
+        }
+        return data ?? [];
       })
       .then((data) => {
         if (!active) return;
@@ -51,9 +57,14 @@ export default function AdminUsers() {
 
   const fetchUsers = async () => {
     const response = await fetch("/api/users?role=SELLER");
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "No se pudieron cargar los asesores.");
-    setUsers(data);
+    const data = await readJsonResponse<Advisor[]>(response);
+    if (!response.ok) {
+      const message = data && typeof data === "object" && "message" in data && typeof (data as { message?: string }).message === "string"
+        ? (data as { message?: string }).message
+        : "No se pudieron cargar los asesores.";
+      throw new Error(message);
+    }
+    setUsers(data ?? []);
     setError("");
   };
 
@@ -78,8 +89,8 @@ export default function AdminUsers() {
         setNewUser({ username: "", password: "", fullName: "", role: "SELLER" });
         await fetchUsers();
       } else {
-        const err = await res.json();
-        alert(`Error: ${err.message}`);
+        const err = (await readJsonResponse<{ message?: string }>(res)) ?? {};
+        alert(`Error: ${err.message || "No se pudo crear el usuario."}`);
       }
     } catch {
       alert("Error de red");

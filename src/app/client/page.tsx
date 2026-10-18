@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiClock, FiAlertCircle } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 interface ReceiptSummary {
   id: number;
@@ -28,12 +29,13 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     fetch("/api/contracts")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.length > 0) setContract(data[0]); // Client usually has 1 active contract
-        setLoading(false);
+      .then(async (res) => {
+        const data = await readJsonResponse<Contract[]>(res);
+        if (!res.ok) throw new Error("No se pudieron cargar los contratos.");
+        if (data && data.length > 0) setContract(data[0]);
       })
-      .catch(() => setLoading(false));
+      .catch(() => setContract(null))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) {

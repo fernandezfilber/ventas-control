@@ -5,6 +5,7 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { FiDownload, FiSearch, FiTrash2, FiUpload, FiUserPlus } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 interface ClientRecord {
   id: number;
@@ -50,9 +51,14 @@ export default function SellerClients() {
     try {
       const query = month === "all" ? "" : `?month=${encodeURIComponent(month)}`;
       const response = await fetch(`/api/clients${query}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "No se pudieron cargar los clientes.");
-      setClients(data);
+      const data = await readJsonResponse<ClientRecord[]>(response);
+      if (!response.ok) {
+        const message = data && typeof data === "object" && "message" in data && typeof (data as { message?: string }).message === "string"
+          ? (data as { message?: string }).message
+          : "No se pudieron cargar los clientes.";
+        throw new Error(message);
+      }
+      setClients(data ?? []);
     } catch (error) {
       setImportResult(error instanceof Error ? error.message : "Error al cargar clientes.");
       setClients([]);
@@ -66,9 +72,14 @@ export default function SellerClients() {
     const query = month === "all" ? "" : `?month=${encodeURIComponent(month)}`;
     fetch(`/api/clients${query}`)
       .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "No se pudieron cargar los clientes.");
-        return data as ClientRecord[];
+        const data = await readJsonResponse<ClientRecord[]>(response);
+        if (!response.ok) {
+          const message = data && typeof data === "object" && "message" in data && typeof (data as { message?: string }).message === "string"
+            ? (data as { message?: string }).message
+            : "No se pudieron cargar los clientes.";
+          throw new Error(message);
+        }
+        return data ?? [] as ClientRecord[];
       })
       .then((data) => {
         if (!active) return;
@@ -154,7 +165,7 @@ export default function SellerClients() {
         if (response.ok) {
           created += 1;
         } else {
-          const result = await response.json();
+          const result = (await readJsonResponse<{ message?: string }>(response)) ?? {};
           errors.push(`Fila ${index + 2}: ${result.message || "datos inválidos"}`);
         }
       }
@@ -175,7 +186,7 @@ export default function SellerClients() {
   const deleteClient = async (client: ClientRecord) => {
     if (!window.confirm(`¿Eliminar a ${client.names} y su contrato? Esta acción no se puede deshacer.`)) return;
     const response = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
-    const result = await response.json();
+    const result = (await readJsonResponse<{ message?: string }>(response)) ?? {};
     if (!response.ok) {
       setImportResult(result.message || "No se pudo eliminar el cliente.");
       return;

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { FiDownload, FiCheck, FiX } from "react-icons/fi";
 import { downloadServiceContractPdf } from "@/lib/contract-pdf";
+import { readJsonResponse } from "@/lib/http";
 
 interface Contract {
   id: number;
@@ -36,12 +37,13 @@ export default function ClientContract() {
 
   useEffect(() => {
     fetch("/api/contracts")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.length > 0) setContract(data[0]);
-        setLoading(false);
+      .then(async (res) => {
+        const data = await readJsonResponse<Contract[]>(res);
+        if (!res.ok) throw new Error("No se pudieron cargar los contratos.");
+        if (data && data.length > 0) setContract(data[0]);
       })
-      .catch(() => setLoading(false));
+      .catch(() => setContract(null))
+      .finally(() => setLoading(false));
   }, []);
 
   // Signature pad logic
@@ -108,8 +110,8 @@ export default function ClientContract() {
       });
       
       if (res.ok) {
-        const updated = await res.json();
-        setContract(updated);
+        const updated = await readJsonResponse<Contract>(res);
+        setContract(updated ?? null);
         alert("Firma guardada correctamente.");
       } else {
         alert("Error al guardar la firma.");

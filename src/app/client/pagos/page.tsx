@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FiCheckCircle, FiClock, FiAlertTriangle } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 interface Receipt {
   id: number;
@@ -18,12 +19,13 @@ export default function ClientPayments() {
 
   useEffect(() => {
     fetch("/api/receipts")
-      .then((res) => res.json())
-      .then((data) => {
-        setReceipts(data);
-        setLoading(false);
+      .then(async (res) => {
+        const data = await readJsonResponse<Receipt[]>(res);
+        if (!res.ok) throw new Error("No se pudieron cargar los recibos.");
+        setReceipts(data ?? []);
       })
-      .catch(() => setLoading(false));
+      .catch(() => setReceipts([]))
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>;

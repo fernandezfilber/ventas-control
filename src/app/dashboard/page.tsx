@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
+import { readJsonResponse } from "@/lib/http";
 
 type Sale = {
   id: number;
@@ -57,9 +58,14 @@ export default function DashboardVentas() {
 
     fetch(`/api/sales?${params.toString()}`)
       .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "No se pudieron cargar las ventas.");
-        return data as Sale[];
+        const data = await readJsonResponse<Sale[]>(response);
+        if (!response.ok) {
+          const message = data && typeof data === "object" && "message" in data && typeof (data as { message?: string }).message === "string"
+            ? (data as { message?: string }).message
+            : "No se pudieron cargar las ventas.";
+          throw new Error(message);
+        }
+        return data ?? [];
       })
       .then((data) => {
         if (active) setSales(data);

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { readJsonResponse } from "@/lib/http";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function NewClientPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(client),
       });
-      const result = await response.json();
+      const result = (await readJsonResponse<{ message?: string }>(response)) ?? {};
       if (!response.ok) {
         setError(result.message || "No se pudo registrar el cliente.");
         return;

@@ -4,6 +4,7 @@ import { useEffect, useState, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink, FiMessageCircle, FiDownload, FiCheck, FiX } from "react-icons/fi";
 import { downloadServiceContractPdf } from "@/lib/contract-pdf";
+import { readJsonResponse } from "@/lib/http";
 
 interface Receipt {
   id: number;
@@ -57,13 +58,19 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   useEffect(() => {
     let active = true;
     fetch("/api/users/me")
-      .then((res) => (res.ok ? res.json() : null))
+      .then(async (res) => {
+        const data = await readJsonResponse<{ role?: string }>(res);
+        return res.ok ? data : null;
+      })
       .then((user) => {
         if (active) setCanConfirmPayments(user?.role === "ADMIN" || user?.role === "SELLER");
       })
       .catch(() => {});
     fetch(`/api/contracts/${id}`)
-      .then((res) => (res.ok ? res.json() : null))
+      .then(async (res) => {
+        const data = await readJsonResponse<Contract>(res);
+        return res.ok ? data : null;
+      })
       .then((data) => {
         if (!active) return;
         setContract(data);
@@ -85,7 +92,10 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         if (active) setLoading(false);
       });
     fetch("/api/users?role=CLIENT")
-      .then((res) => (res.ok ? res.json() : []))
+      .then(async (res) => {
+        const data = await readJsonResponse<ClientUserOption[]>(res);
+        return res.ok ? data ?? [] : [];
+      })
       .then((data) => {
         if (active) setUsers(data);
       })
@@ -97,7 +107,10 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
 
   const refreshContract = () => {
     fetch(`/api/contracts/${id}`)
-      .then((res) => (res.ok ? res.json() : null))
+      .then(async (res) => {
+        const data = await readJsonResponse<Contract>(res);
+        return res.ok ? data : null;
+      })
       .then((data) => {
         setContract(data);
         setLoading(false);
@@ -131,7 +144,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         body: JSON.stringify(clientData),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error = (await readJsonResponse<{ message?: string }>(res)) ?? {};
         alert(error.message || "No se pudieron actualizar los datos del cliente.");
         return;
       }
@@ -197,11 +210,11 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
         body: JSON.stringify({ signature, signerRole: "SELLER" }),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error = (await readJsonResponse<{ message?: string }>(res)) ?? {};
         alert(error.message || "No se pudo guardar la firma.");
         return;
       }
-      setContract(await res.json());
+      setContract((await readJsonResponse<Contract>(res)) ?? null);
     } catch {
       alert("Error de conexión.");
     } finally {

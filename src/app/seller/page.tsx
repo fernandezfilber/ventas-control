@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FiTrendingUp, FiUsers, FiMessageCircle } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 type ContractSummary = {
   status: string;
@@ -19,9 +20,14 @@ export default function SellerDashboard() {
     let active = true;
     fetch("/api/contracts")
       .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "No se pudieron cargar las ventas.");
-        return data as ContractSummary[];
+        const data = await readJsonResponse<ContractSummary[]>(res);
+        if (!res.ok) {
+          const message = data && typeof data === "object" && "message" in data && typeof (data as { message?: string }).message === "string"
+            ? (data as { message?: string }).message
+            : "No se pudieron cargar las ventas.";
+          throw new Error(message);
+        }
+        return data ?? [];
       })
       .then((contracts) => {
         const now = new Date();

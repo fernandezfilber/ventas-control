@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FiCheck, FiSearch } from "react-icons/fi";
+import { readJsonResponse } from "@/lib/http";
 
 interface AdminContract {
   id: number;
@@ -20,12 +21,13 @@ export default function AdminContracts() {
 
   useEffect(() => {
     fetch("/api/contracts")
-      .then((res) => res.json())
-      .then((data) => {
-        setContracts(data);
-        setLoading(false);
+      .then(async (res) => {
+        const data = await readJsonResponse<AdminContract[]>(res);
+        if (!res.ok) throw new Error("No se pudieron cargar los contratos.");
+        setContracts(data ?? []);
       })
-      .catch(() => setLoading(false));
+      .catch(() => setContracts([]))
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = contracts.filter((c) =>
