@@ -32,6 +32,8 @@ services:
     image: evoapicloud/evolution-api:v2.3.7
     container_name: evolution-api
     restart: unless-stopped
+    ports:
+      - "8080:8080"
     environment:
       AUTHENTICATION_API_KEY: "${EVOLUTION_API_KEY:?Define EVOLUTION_API_KEY en .env}"
       SERVER_URL: "http://evolution-api:8080"
