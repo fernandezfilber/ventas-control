@@ -80,13 +80,30 @@ export async function POST(req: Request) {
     const names = typeof data.names === 'string' ? data.names.trim() : '';
     const dni = typeof data.dni === 'string' ? data.dni.trim() : '';
     const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
+    const installationDate = typeof data.installationDate === 'string' && data.installationDate
+      ? data.installationDate
+      : null;
     const address = typeof data.address === 'string' ? data.address.trim() : '';
     const monthlyAmount = Number(String(data.monthlyAmount ?? '').replace(',', '.'));
+    const installationDateMatch = installationDate
+      ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(installationDate)
+      : null;
+    const installationYear = installationDateMatch ? Number(installationDateMatch[1]) : 0;
+    const installationMonth = installationDateMatch ? Number(installationDateMatch[2]) - 1 : 0;
+    const installationDay = installationDateMatch ? Number(installationDateMatch[3]) : 0;
+    const parsedInstallationDate = installationDateMatch
+      ? new Date(Date.UTC(installationYear, installationMonth, installationDay))
+      : null;
+    const startedAt = parsedInstallationDate ?? new Date();
 
     if (!names || !/^\d{8,12}$/.test(dni) || !phone || !address ||
+      (installationDate !== null && (!installationDateMatch ||
+        parsedInstallationDate?.getUTCFullYear() !== installationYear ||
+        parsedInstallationDate?.getUTCMonth() !== installationMonth ||
+        parsedInstallationDate?.getUTCDate() !== installationDay)) ||
       !Number.isFinite(monthlyAmount) || monthlyAmount <= 0) {
       return NextResponse.json({
-        message: 'Completa nombre, DNI, teléfono, dirección y un monto mensual válido.',
+        message: 'Completa nombre, DNI, teléfono, dirección y un monto mensual válido. La fecha de instalación debe ser válida.',
       }, { status: 400 });
     }
 
@@ -124,10 +141,12 @@ export async function POST(req: Request) {
     }
 
     const password = await bcrypt.hash(dni, 10);
-    const startedAt = new Date();
-    const endDate = new Date(startedAt.getFullYear(), startedAt.getMonth() + 3, 1);
-    endDate.setDate(Math.min(startedAt.getDate(), new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0).getDate()));
-    const paymentDay = startedAt.getDate();
+    const paymentDay = startedAt.getUTCDate();
+    const endDate = new Date(Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth() + 3, 1));
+    endDate.setUTCDate(Math.min(
+      paymentDay,
+      new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0)).getUTCDate(),
+    ));
 
     const sale = await prisma.$transaction(async (tx) => {
       const lastSale = await tx.sale.findFirst({ orderBy: { id: 'desc' }, select: { id: true } });
@@ -151,11 +170,14 @@ export async function POST(req: Request) {
           sellerId,
             },
           });
-      const contractNumber = `FV-${startedAt.getFullYear()}-${String((lastContract?.id ?? 0) + 1).padStart(4, '0')}`;
+      const contractNumber = `FV-${startedAt.getUTCFullYear()}-${String((lastContract?.id ?? 0) + 1).padStart(4, '0')}`;
       const correlativeId = String((lastSale?.id ?? 0) + 1).padStart(4, '0');
       const receipts = [1, 2, 3].map((month) => {
-        const dueDate = new Date(startedAt.getFullYear(), startedAt.getMonth() + month, 1);
-        dueDate.setDate(Math.min(paymentDay, new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate()));
+        const dueDate = new Date(Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth() + month, 1));
+        dueDate.setUTCDate(Math.min(
+          paymentDay,
+          new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
+        ));
         return { monthNumber: month, dueDate, amount: monthlyAmount };
       });
 
@@ -169,7 +191,8 @@ export async function POST(req: Request) {
           address,
           phone,
           locationLink: typeof data.locationLink === 'string' ? data.locationLink.trim() : '',
-          installationDate: typeof data.installationDate === 'string' ? data.installationDate : null,
+          referencePhotos: '',
+          installationDate,
           internetPlan: typeof data.internetPlan === 'string' ? data.internetPlan.trim() : null,
           details: typeof data.details === 'string' ? data.details.trim() : null,
           sellerNameOrId: sellerUser?.fullName || sellerUser?.username || auth.fullName || auth.username,

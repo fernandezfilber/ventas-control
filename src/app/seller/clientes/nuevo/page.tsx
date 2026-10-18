@@ -12,6 +12,7 @@ export default function NewClientPage() {
     names: "",
     dni: "",
     phone: "",
+    installationDate: "",
     address: "",
     locationLink: "",
     internetPlan: "",
@@ -70,6 +71,10 @@ export default function NewClientPage() {
           <div className="form-group">
             <label htmlFor="phone">Celular</label>
             <input id="phone" required type="tel" autoComplete="tel" value={client.phone} onChange={(event) => setField("phone", event.target.value)} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="installationDate">Fecha real de instalación</label>
+            <input id="installationDate" required type="date" value={client.installationDate} onChange={(event) => setField("installationDate", event.target.value)} />
           </div>
           <div className="form-group">
             <label htmlFor="address">Dirección del servicio</label>

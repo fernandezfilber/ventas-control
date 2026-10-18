@@ -17,13 +17,13 @@ La cuenta administrativa se crea una sola vez mediante `POST /api/auth/seed`, en
 - **Asesor:** registra y administra su cartera de clientes, importa hojas Excel, descarga listas y confirma pagos recibidos.
 - **Cliente:** consulta su mensualidad, contrato y pagos; puede firmar y descargar el contrato en PDF.
 
-Las cuentas nuevas de clientes usan el DNI como usuario y contraseña inicial. El asesor debe comunicarlo al cliente y recomendar que cambie la contraseña.
+Las cuentas nuevas de clientes usan el DNI como usuario y contraseña inicial. El asesor debe comunicarlo al cliente y recomendar que cambie la contraseña. Al registrar un cliente instalado, ingresa su fecha real de instalación; esta fecha inicia el contrato y determina el día de vencimiento de sus mensualidades.
 
 ## WhatsApp
 
 Los recordatorios se envían manualmente desde la ficha del cliente: el botón abre WhatsApp con un mensaje preparado y el asesor debe revisarlo y enviarlo desde la cuenta iniciada en el dispositivo. Contacto de ForwardVision: **+51 955 318 590**.
 
-El envío automático no está habilitado. Una cuenta personal o la aplicación WhatsApp Business no permiten automatizar mensajes desde el servidor. Se necesitará WhatsApp Business Platform/Cloud API, consentimiento del cliente y plantillas aprobadas para habilitarlo posteriormente.
+El envío automático todavía no está habilitado. La automatización solicitada (cinco días antes del vencimiento y el mismo día) requiere WhatsApp Business Platform/Cloud API, consentimiento explícito del cliente, plantillas aprobadas por Meta y una tarea programada diaria en el servidor. Una cuenta personal o la aplicación WhatsApp Business no permiten automatizar mensajes desde el servidor.
 
 ## Estado del contrato
 
