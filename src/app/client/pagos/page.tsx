@@ -16,6 +16,10 @@ interface Receipt {
 export default function ClientPayments() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [remindersEnabled, setRemindersEnabled] = useState(false);
+  const [consentLoading, setConsentLoading] = useState(true);
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentError, setConsentError] = useState("");
 
   useEffect(() => {
     fetch("/api/receipts")
@@ -26,13 +30,62 @@ export default function ClientPayments() {
       })
       .catch(() => setReceipts([]))
       .finally(() => setLoading(false));
+
+    fetch("/api/users/me")
+      .then(async (res) => {
+        const data = await readJsonResponse<{ whatsappRemindersEnabled: boolean; message?: string }>(res);
+        if (!res.ok || !data) throw new Error(data?.message || "No se pudo cargar tu consentimiento.");
+        setRemindersEnabled(data.whatsappRemindersEnabled);
+      })
+      .catch((error: unknown) => {
+        setConsentError(error instanceof Error ? error.message : "No se pudo cargar tu consentimiento.");
+      })
+      .finally(() => setConsentLoading(false));
   }, []);
+
+  const updateReminderConsent = async (enabled: boolean) => {
+    const previousValue = remindersEnabled;
+    setRemindersEnabled(enabled);
+    setConsentSaving(true);
+    setConsentError("");
+    try {
+      const response = await fetch("/api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ whatsappRemindersEnabled: enabled }),
+      });
+      const result = await readJsonResponse<{ message?: string }>(response);
+      if (!response.ok) throw new Error(result?.message || "No se pudo guardar tu preferencia.");
+    } catch (error) {
+      setRemindersEnabled(previousValue);
+      setConsentError(error instanceof Error ? error.message : "No se pudo guardar tu preferencia.");
+    } finally {
+      setConsentSaving(false);
+    }
+  };
 
   if (loading) return <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>;
 
   return (
     <div>
       <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "20px" }}>Tus Pagos</h2>
+
+      <section className="client-card" style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 8 }}>Recordatorios por WhatsApp</h3>
+        <p style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: 12 }}>
+          Si aceptas, recibirás un aviso cinco días antes del vencimiento y otro el día de pago. Puedes retirar tu consentimiento cuando quieras.
+        </p>
+        {consentError && <p role="alert" style={{ color: "#fca5a5", fontSize: "0.85rem", marginBottom: 10 }}>{consentError}</p>}
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: "0.9rem" }}>
+          <input
+            type="checkbox"
+            checked={remindersEnabled}
+            disabled={consentLoading || consentSaving}
+            onChange={(event) => void updateReminderConsent(event.target.checked)}
+          />
+          <span>{consentSaving ? "Guardando..." : "Acepto recibir recordatorios automáticos de pago por WhatsApp."}</span>
+        </label>
+      </section>
       
       {receipts.length === 0 ? (
         <div className="client-card" style={{ textAlign: "center", color: "#94a3b8" }}>

@@ -14,6 +14,15 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
+# Minimal image for applying production Prisma migrations on the database network.
+FROM node:20-alpine AS migrate
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY prisma ./prisma
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 # Imagen final
 FROM node:20-alpine AS runner
 WORKDIR /app

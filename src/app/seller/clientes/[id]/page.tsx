@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiCheckCircle, FiClock, FiAlertTriangle, FiPhone, FiMapPin, FiLink, FiMessageCircle, FiDownload, FiCheck, FiX } from "react-icons/fi";
 import { downloadServiceContractPdf } from "@/lib/contract-pdf";
@@ -38,6 +39,24 @@ interface ClientUserOption {
   fullName: string | null;
 }
 
+interface PaymentProof {
+  id: number;
+  candidateReceiptId: number | null;
+  mimeType: string;
+  caption: string | null;
+  status: string;
+  receivedAt: string;
+  reviewedAt: string | null;
+}
+
+interface PendingReceiptOption {
+  id: number;
+  monthNumber: number;
+  dueDate: string;
+  amount: number;
+  contract: { contractNumber: string };
+}
+
 export default function SellerClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -45,6 +64,11 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
   const [canConfirmPayments, setCanConfirmPayments] = useState(false);
+  const [paymentProofs, setPaymentProofs] = useState<PaymentProof[]>([]);
+  const [pendingReceipts, setPendingReceipts] = useState<PendingReceiptOption[]>([]);
+  const [proofReceiptSelections, setProofReceiptSelections] = useState<Record<number, string>>({});
+  const [proofReviewError, setProofReviewError] = useState("");
+  const [reviewingProofId, setReviewingProofId] = useState<number | null>(null);
   const [users, setUsers] = useState<ClientUserOption[]>([]);
   const [linking, setLinking] = useState(false);
   const [editingClient, setEditingClient] = useState(false);
@@ -54,6 +78,36 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const refreshPaymentProofs = async (clientUserId: number) => {
+    try {
+      const response = await fetch(`/api/payment-proofs?clientUserId=${clientUserId}`);
+      const data = await readJsonResponse<{
+        proofs: PaymentProof[];
+        pendingReceipts: PendingReceiptOption[];
+        message?: string;
+      }>(response);
+      if (!response.ok || !data) {
+        throw new Error(data?.message || "No se pudieron cargar las capturas de pago.");
+      }
+      setPaymentProofs(data.proofs);
+      setPendingReceipts(data.pendingReceipts);
+      setProofReceiptSelections((current) => {
+        const next = { ...current };
+        for (const proof of data.proofs) {
+          if (proof.candidateReceiptId &&
+            data.pendingReceipts.some((receipt) => receipt.id === proof.candidateReceiptId) &&
+            !next[proof.id]) {
+            next[proof.id] = String(proof.candidateReceiptId);
+          }
+        }
+        return next;
+      });
+      setProofReviewError("");
+    } catch (error) {
+      setProofReviewError(error instanceof Error ? error.message : "No se pudieron cargar las capturas de pago.");
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -85,6 +139,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
             monthlyAmount: String(data.monthlyAmount),
             details: data.sale.details || "",
           });
+          if (data.clientUser) void refreshPaymentProofs(data.clientUser.id);
         }
         setLoading(false);
       })
@@ -124,12 +179,45 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     try {
       const res = await fetch(`/api/receipts/${receiptId}/pay`, { method: "PUT" });
       if (res.ok) {
+        if (contract?.clientUser) await refreshPaymentProofs(contract.clientUser.id);
         refreshContract();
       } else {
         alert("Error al procesar el pago");
       }
     } catch {
       alert("Error de red");
+    }
+  };
+
+  const handleReviewPaymentProof = async (proof: PaymentProof, action: "approve" | "reject") => {
+    const receiptId = Number(proofReceiptSelections[proof.id]);
+    if (action === "approve" && (!Number.isInteger(receiptId) || receiptId <= 0)) {
+      setProofReviewError("Selecciona el recibo al que corresponde esta captura.");
+      return;
+    }
+    const selectedReceipt = pendingReceipts.find((receipt) => receipt.id === receiptId);
+    const confirmation = action === "approve"
+      ? `¿Confirmaste en Yape o en tu cuenta que se recibió S/ ${selectedReceipt?.amount.toFixed(2)}? Al confirmar, este recibo se marcará pagado y dejará de recibir recordatorios.`
+      : "¿Rechazar esta captura? El recibo seguirá pendiente y continuarán los recordatorios.";
+    if (!window.confirm(confirmation)) return;
+
+    setReviewingProofId(proof.id);
+    setProofReviewError("");
+    try {
+      const response = await fetch(`/api/payment-proofs/${proof.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...(action === "approve" ? { receiptId } : {}) }),
+      });
+      const result = await readJsonResponse<{ message?: string }>(response);
+      if (!response.ok) throw new Error(result?.message || "No se pudo revisar la captura.");
+      setProofReviewError("");
+      if (contract?.clientUser) await refreshPaymentProofs(contract.clientUser.id);
+      refreshContract();
+    } catch (error) {
+      setProofReviewError(error instanceof Error ? error.message : "No se pudo revisar la captura.");
+    } finally {
+      setReviewingProofId(null);
     }
   };
 
@@ -417,9 +505,84 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       <section className="card" style={{ marginBottom: "20px" }}>
         <h3 style={{ color: "var(--fv-navy)", marginBottom: "8px" }}>Recordatorios de pago por WhatsApp</h3>
         <p style={{ margin: "8px 0 0", fontSize: "0.8rem", color: "var(--text-light)" }}>
-          Los avisos se envían manualmente desde WhatsApp. La cuenta debe estar iniciada en este dispositivo; confirma el pago aquí cuando el cliente pague.
+          Los avisos automáticos se envían cinco días antes y el día del vencimiento, solo si el cliente aceptó recibirlos. El cliente puede desactivarlos desde su cuenta, en Pagos. Confirma aquí cuando recibas el pago.
         </p>
       </section>
+
+      {canConfirmPayments && contract.clientUser && (
+        <section className="card" style={{ marginBottom: "20px" }}>
+          <h3 style={{ color: "var(--fv-navy)", marginBottom: 8 }}>Capturas de Yape recibidas</h3>
+          <p style={{ color: "var(--text-light)", fontSize: ".82rem", marginBottom: 12 }}>
+            La imagen es solo una evidencia pendiente: no verifica que el dinero haya ingresado. Confirma el abono antes de aprobarla. Si hay varios recibos, selecciona el correcto; hasta entonces seguirán los recordatorios.
+          </p>
+          {proofReviewError && <p role="alert" style={{ color: "var(--fv-red)", marginBottom: 12 }}>{proofReviewError}</p>}
+          {paymentProofs.length === 0 ? (
+            <p style={{ color: "var(--text-light)", fontSize: ".85rem" }}>Todavía no hay capturas recibidas de este cliente.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {paymentProofs.map((proof) => (
+                <article key={proof.id} style={{ border: "1px solid var(--border-color)", borderRadius: 10, padding: 12 }}>
+                  <Image
+                    src={`/api/payment-proofs/${proof.id}/image`}
+                    alt={`Captura de pago recibida el ${new Date(proof.receivedAt).toLocaleString("es-PE")}`}
+                    width={420}
+                    height={420}
+                    unoptimized
+                    style={{ display: "block", width: "100%", maxWidth: 420, maxHeight: 420, objectFit: "contain", margin: "0 auto 10px", borderRadius: 8 }}
+                  />
+                  <div style={{ fontSize: ".82rem", color: "var(--text-light)", marginBottom: 8 }}>
+                    Recibida: {new Date(proof.receivedAt).toLocaleString("es-PE")}
+                    {proof.caption ? ` · ${proof.caption}` : ""}
+                  </div>
+                  <strong style={{ fontSize: ".85rem" }}>
+                    {proof.status === "PENDING_REVIEW" ? "Pendiente de verificación" : proof.status === "ACCEPTED" ? "Pago confirmado" : "Captura rechazada"}
+                  </strong>
+                  {proof.status === "PENDING_REVIEW" && (
+                    <>
+                      <label htmlFor={`proof-receipt-${proof.id}`} className="form-group" style={{ display: "block", marginTop: 10, marginBottom: 10 }}>
+                        <span style={{ display: "block", fontSize: ".8rem", fontWeight: 600, marginBottom: 5 }}>Recibo relacionado</span>
+                        <select
+                          id={`proof-receipt-${proof.id}`}
+                          value={proofReceiptSelections[proof.id] ?? ""}
+                          onChange={(event) => setProofReceiptSelections((current) => ({ ...current, [proof.id]: event.target.value }))}
+                          style={{ width: "100%", padding: 9, border: "1px solid var(--border-color)", borderRadius: 8 }}
+                        >
+                          <option value="">Selecciona un pago pendiente...</option>
+                          {pendingReceipts.map((receipt) => (
+                            <option key={receipt.id} value={receipt.id}>
+                              {receipt.contract.contractNumber} · Mes {receipt.monthNumber} · S/ {receipt.amount.toFixed(2)} · vence {new Date(receipt.dueDate).toLocaleDateString("es-PE")}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="btn-success"
+                          disabled={reviewingProofId === proof.id || pendingReceipts.length === 0}
+                          onClick={() => void handleReviewPaymentProof(proof, "approve")}
+                          style={{ padding: "8px 12px" }}
+                        >
+                          {reviewingProofId === proof.id ? "Guardando..." : "Confirmar abono y detener avisos"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          disabled={reviewingProofId === proof.id}
+                          onClick={() => void handleReviewPaymentProof(proof, "reject")}
+                          style={{ padding: "8px 12px", color: "var(--fv-red)", borderColor: "var(--fv-red)" }}
+                        >
+                          Rechazar captura
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Recibos */}
       <h3 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--fv-navy)", marginBottom: "16px" }}>Historial de Recibos</h3>
@@ -430,7 +593,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
           const isOverdue = r.status === "OVERDUE" || (!isPaid && new Date(r.dueDate) < new Date());
           const phoneDigits = contract.sale.phone.replace(/\D/g, "");
           const whatsappPhone = phoneDigits.length === 9 ? `51${phoneDigits}` : phoneDigits;
-          const reminderMessage = `Hola ${contract.sale.names}, te recordamos el pago de S/ ${r.amount.toFixed(2)} correspondiente al mes ${r.monthNumber}, con vencimiento el ${new Date(r.dueDate).toLocaleDateString("es-PE")}. Si ya pagaste, ignora este mensaje. ForwardVision: +51 955 318 590.`;
+          const reminderMessage = `Hola ${contract.sale.names}, te recordamos el pago de S/ ${r.amount.toFixed(2)} correspondiente al mes ${r.monthNumber}, con vencimiento el ${new Date(r.dueDate).toLocaleDateString("es-PE")}. Si ya pagaste, ignora este mensaje. Para dejar de recibir recordatorios, responde SALIR o desactívalos en tu cuenta de cliente, en Pagos. ForwardVision: +51 955 318 590.`;
           const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(reminderMessage)}`;
           
           let statusColor = "var(--fv-blue)";

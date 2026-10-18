@@ -6,7 +6,7 @@ Aplicación web responsive para administrar asesores, clientes, contratos de ser
 
 1. Instala dependencias: `npm install`.
 2. Configura `DATABASE_URL` para MySQL, un `JWT_SECRET` aleatorio y `ADMIN_SETUP_TOKEN` para habilitar el registro inicial del administrador.
-3. Actualiza el cliente y el esquema de Prisma: `npm exec -- prisma generate` y `npm exec -- prisma db push`.
+3. Actualiza el cliente de Prisma: `npm exec -- prisma generate`. Para desarrollo local puedes sincronizar el esquema con `npm exec -- prisma db push`.
 4. Inicia el proyecto con `npm run dev`.
 
 La cuenta administrativa se crea una sola vez mediante `POST /api/auth/seed`, enviando el token en la cabecera `x-admin-setup-token` y un usuario/contraseña propios en el cuerpo. La contraseña inicial debe tener al menos 12 caracteres. No expongas credenciales, tokens ni archivos `.env` en el repositorio.
@@ -19,11 +19,19 @@ La cuenta administrativa se crea una sola vez mediante `POST /api/auth/seed`, en
 
 Las cuentas nuevas de clientes usan el DNI como usuario y contraseña inicial. El asesor debe comunicarlo al cliente y recomendar que cambie la contraseña. Al registrar un cliente instalado, ingresa su fecha real de instalación; esta fecha inicia el contrato y determina el día de vencimiento de sus mensualidades.
 
-## WhatsApp
+## Lista de clientes
 
-Los recordatorios se envían manualmente desde la ficha del cliente: el botón abre WhatsApp con un mensaje preparado y el asesor debe revisarlo y enviarlo desde la cuenta iniciada en el dispositivo. Contacto de ForwardVision: **+51 955 318 590**.
+La lista muestra todos los clientes por defecto y permite buscar o filtrar por mes. Los estados se marcan en rojo para pagos vencidos, amarillo para vencimientos dentro de cinco días y verde para clientes al día. En móvil se muestra un resumen compacto; en escritorio se incluyen también DNI, teléfono, plan, dirección y vencimiento.
 
-El envío automático todavía no está habilitado. La automatización solicitada (cinco días antes del vencimiento y el mismo día) requiere WhatsApp Business Platform/Cloud API, consentimiento explícito del cliente, plantillas aprobadas por Meta y una tarea programada diaria en el servidor. Una cuenta personal o la aplicación WhatsApp Business no permiten automatizar mensajes desde el servidor.
+## Recordatorios automáticos por WhatsApp
+
+La aplicación usa Evolution API con Baileys (sesión vinculada a WhatsApp Web), no WhatsApp Cloud API. Es una integración no oficial: WhatsApp puede desconectar o restringir la cuenta y no hay garantía de disponibilidad. El volumen bajo no elimina ese riesgo. Para producción, usa un número dedicado y no el número personal principal.
+
+El cliente debe activar su consentimiento en **Pagos**; por defecto está desactivado y puede retirarlo en cualquier momento desde la misma pantalla. Solo se envían avisos para recibos pendientes cinco días antes y el día del vencimiento. Los avisos salen de forma secuencial, con una pausa aleatoria de 5 a 15 segundos entre mensajes para no enviarlos todos a la vez. Una ejecución puede tardar hasta unos 25 minutos si hay 100 mensajes; programa un solo cron diario y evita ejecuciones simultáneas.
+
+Cada aviso permite responder **SALIR** para darse de baja. Evolution API debe enviar el evento `MESSAGES_UPSERT` al webhook privado de la aplicación para desactivar los avisos del número remitente. También pueden desactivarse en **Pagos**. El envío requiere que la instancia `forwardvision` de Evolution API esté conectada y que el cron diario esté configurado. Contacto de ForwardVision: **+51 955 318 590**.
+
+Las imágenes enviadas por WhatsApp desde el número registrado del cliente se guardan como capturas pendientes para que el asesor las revise en la ficha. Recibir una imagen no confirma un pago ni detiene los avisos: el asesor debe comprobar el abono y aprobar la captura asociándola a un recibo, o registrar manualmente el pago. En ambos casos, al quedar el recibo marcado pagado, cesan sus recordatorios. Si hay varios recibos pendientes, la captura queda sin asociación y el asesor debe elegir el correcto. Las capturas se almacenan en MySQL; la lectura está protegida por la sesión del asesor.
 
 ## Estado del contrato
 
@@ -35,6 +43,23 @@ La primera hoja del archivo debe incluir estas columnas: `nombres`, `dni`, `tele
 
 ## Despliegue en Docker
 
-Configura un archivo `.env` en el servidor con las credenciales de MySQL y un `JWT_SECRET` aleatorio. No lo subas al repositorio. La aplicación se conecta a `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`.
+Configura un archivo `.env` en el servidor con las credenciales de MySQL, un `JWT_SECRET` aleatorio, un `CRON_SECRET` aleatorio y un `EVOLUTION_API_KEY` aleatorio (el mismo valor autentica a Evolution API y a la aplicación). No lo subas al repositorio. La aplicación se conecta a `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`. Evolution API se ejecuta como servicio interno y conserva la sesión de WhatsApp en un volumen Docker.
 
-`TRAEFIK_ACME_EMAIL` pertenece al servicio central de Traefik; configúralo en el resolver ACME correspondiente. Después de definir las variables privadas, ejecuta `docker-compose up --build -d`.
+Después del primer despliegue, crea la instancia Baileys `forwardvision` en Evolution API (`POST /instance/create`, con `instanceName: "forwardvision"`, `integration: "WHATSAPP-BAILEYS"` y `qrcode: true`), solicita la conexión con `GET /instance/connect/forwardvision` y escanea el QR con el teléfono dedicado. Autentica las solicitudes a Evolution API con el encabezado `apikey` y `EVOLUTION_API_KEY`. Mantén el dispositivo conectado y comprueba que la instancia esté en línea. No expongas la API públicamente sin protegerla.
+
+Configura en esa instancia un webhook de mensajes entrantes (`MESSAGES_UPSERT`) con `webhook_by_events: false` y `webhook_base64: true`, que apunte a `http://ventas-app:3000/api/whatsapp/evolution-webhook/EVOLUTION_WEBHOOK_SECRET`. Sustituye el último segmento por el valor de `EVOLUTION_WEBHOOK_SECRET` del `.env`; la URL privada usa el nombre del contenedor en la red Docker compartida. La clave aleatoria protege el endpoint; el manejador procesa respuestas `SALIR` e imágenes entrantes directas. Las imágenes mayores de 6 MB o sin su contenido Base64 se ignoran y no detienen recordatorios.
+
+Antes de iniciar la versión nueva, aplica la migración aditiva a la base MySQL existente:
+
+```bash
+docker compose --profile migrations run --rm prisma-migrate
+```
+
+Después despliega con `docker-compose up --build -d`. Programa el endpoint para ejecutarse diariamente, por ejemplo a las 9:00 a. m. hora de Perú, enviando el secreto como `Authorization: Bearer`:
+
+```cron
+CRON_TZ=America/Lima
+0 9 * * * curl --fail --silent --show-error -X POST -H "Authorization: Bearer TU_CRON_SECRET" https://ventas.forwardvision.cloud/api/cron/payment-reminders
+```
+
+El endpoint reporta errores de conexión o envío y acepta reintentos; los avisos enviados correctamente quedan registrados para no repetirlos. `TRAEFIK_ACME_EMAIL` pertenece al servicio central de Traefik; configúralo en el resolver ACME correspondiente.

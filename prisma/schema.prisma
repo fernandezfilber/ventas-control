@@ -8,26 +8,27 @@ datasource db {
 }
 
 model User {
-  id                       Int        @id @default(autoincrement())
-  username                 String     @unique
+  id                       Int      @id @default(autoincrement())
+  username                 String   @unique
   password                 String
-  role                     String     @default("SELLER")
+  role                     String   @default("SELLER")
   fullName                 String?
   phone                    String?
   sellerId                 Int?
-  whatsappRemindersEnabled Boolean    @default(false)
-  createdAt                DateTime   @default(now())
+  whatsappRemindersEnabled Boolean  @default(false)
+  createdAt                DateTime @default(now())
 
-  clientContracts Contract[] @relation("ClientContracts")
-  sellerContracts Contract[] @relation("SellerContracts")
-  clientSales     Sale[]     @relation("ClientSales")
-  sellerSales     Sale[]     @relation("SellerSales")
+  clientContracts Contract[]     @relation("ClientContracts")
+  sellerContracts Contract[]     @relation("SellerContracts")
+  clientSales     Sale[]         @relation("ClientSales")
+  sellerSales     Sale[]         @relation("SellerSales")
+  paymentProofs   PaymentProof[] @relation("ClientPaymentProofs")
 }
 
 model Sale {
   id                    Int       @id @default(autoincrement())
   correlativeId         String    @unique
-  clientId              String?   // código interno de caja
+  clientId              String? // código interno de caja
   clientUserId          Int?
   clientUser            User?     @relation("ClientSales", fields: [clientUserId], references: [id])
   sellerUserId          Int?
@@ -42,7 +43,7 @@ model Sale {
   referencePhotos       String?   @db.LongText
   internetPlan          String?
   details               String?   @db.Text
-  status                String    @default("PENDING")   // PENDING | INSTALLED
+  status                String    @default("PENDING") // PENDING | INSTALLED
   sellerNameOrId        String
   installedAt           DateTime?
   createdAt             DateTime  @default(now())
@@ -69,7 +70,7 @@ model Contract {
   clientSignature String?   @db.LongText
   sellerSignature String?   @db.LongText
   paymentDay      Int
-  reminderMode     String    @default("MANUAL")
+  reminderMode    String    @default("MANUAL")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -77,17 +78,40 @@ model Contract {
 }
 
 model Receipt {
-  id                  Int       @id @default(autoincrement())
-  contractId          Int
-  contract            Contract  @relation(fields: [contractId], references: [id])
-  monthNumber         Int       // 1, 2, 3
-  dueDate             DateTime
-  paidAt              DateTime?
-  amount              Float
-  status              String    @default("PENDING") // PENDING | PAID | OVERDUE
-  lastReminderAt      DateTime? @map("reminderLastSentAt")
-  reminderCount       Int       @default(0)
-  createdAt           DateTime  @default(now())
+  id                     Int       @id @default(autoincrement())
+  contractId             Int
+  contract               Contract  @relation(fields: [contractId], references: [id])
+  monthNumber            Int // 1, 2, 3
+  dueDate                DateTime
+  paidAt                 DateTime?
+  amount                 Float
+  status                 String    @default("PENDING") // PENDING | PAID | OVERDUE
+  lastReminderAt         DateTime? @map("reminderLastSentAt")
+  reminderCount          Int       @default(0)
+  reminderFiveDaysSentAt DateTime?
+  reminderDueDateSentAt  DateTime?
+  reminderClaimedAt      DateTime?
+  reminderClaimedStage   String?
+  createdAt              DateTime  @default(now())
+
+  paymentProofs PaymentProof[]
+}
+
+model PaymentProof {
+  id                 Int       @id @default(autoincrement())
+  messageId          String    @unique
+  clientUserId       Int?
+  clientUser         User?     @relation("ClientPaymentProofs", fields: [clientUserId], references: [id])
+  candidateReceiptId Int?
+  candidateReceipt   Receipt?  @relation(fields: [candidateReceiptId], references: [id])
+  senderPhone        String
+  mimeType           String
+  imageBase64        String    @db.LongText
+  caption            String?   @db.Text
+  status             String    @default("PENDING_REVIEW") // PENDING_REVIEW | ACCEPTED | REJECTED
+  receivedAt         DateTime  @default(now())
+  reviewedAt         DateTime?
+  reviewedByUserId   Int?
 }
 
 model Employee {

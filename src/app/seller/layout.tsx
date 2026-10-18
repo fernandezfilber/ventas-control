@@ -46,7 +46,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
       </div>
 
       {/* Content */}
-      <main style={{ maxWidth: "700px", margin: "0 auto", padding: "16px" }}>
+      <main className="seller-content" style={{ maxWidth: "700px", margin: "0 auto", padding: "16px" }}>
         {children}
       </main>
 

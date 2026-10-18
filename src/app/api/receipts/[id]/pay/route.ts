@@ -45,11 +45,24 @@ export async function PUT(
   }
   if (receipt.status === 'PAID') return NextResponse.json(receipt);
 
-  const result = await prisma.receipt.updateMany({
-    where: { id: receiptId, status: 'PENDING' },
-    data: { status: 'PAID', paidAt: new Date() },
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.receipt.updateMany({
+      where: { id: receiptId, status: { not: 'PAID' } },
+      data: { status: 'PAID', paidAt: new Date() },
+    });
+    if (updated.count === 0) return 0;
+
+    await tx.paymentProof.updateMany({
+      where: { candidateReceiptId: receiptId, status: 'PENDING_REVIEW' },
+      data: {
+        status: 'ACCEPTED',
+        reviewedAt: new Date(),
+        reviewedByUserId: auth.userId,
+      },
+    });
+    return updated.count;
   });
-  if (result.count === 0) {
+  if (result === 0) {
     return NextResponse.json({ message: 'El recibo ya no está pendiente de pago' }, { status: 409 });
   }
 

@@ -7,13 +7,17 @@ services:
       DATABASE_URL: "mysql://root:${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}@mysql_central:3306/ventas_control"
       REDIS_URL: "redis://:${REDIS_PASSWORD:?Define REDIS_PASSWORD en .env}@redis_central:6379"
       JWT_SECRET: "${JWT_SECRET:?Define JWT_SECRET en .env}"
-      CRON_SECRET: "${CRON_SECRET:-}"
+      CRON_SECRET: "${CRON_SECRET:?Define CRON_SECRET en .env}"
       WHATSAPP_ACCESS_TOKEN: "${WHATSAPP_ACCESS_TOKEN:-}"
       WHATSAPP_PHONE_NUMBER_ID: "${WHATSAPP_PHONE_NUMBER_ID:-}"
       WHATSAPP_TEMPLATE_NAME: "${WHATSAPP_TEMPLATE_NAME:-}"
       WHATSAPP_TEMPLATE_LANGUAGE: "${WHATSAPP_TEMPLATE_LANGUAGE:-es_PE}"
       WHATSAPP_DEFAULT_COUNTRY_CODE: "${WHATSAPP_DEFAULT_COUNTRY_CODE:-51}"
       WHATSAPP_GRAPH_VERSION: "${WHATSAPP_GRAPH_VERSION:-v22.0}"
+      EVOLUTION_API_URL: "${EVOLUTION_API_URL:-http://evolution-api:8080}"
+      EVOLUTION_API_KEY: "${EVOLUTION_API_KEY:?Define EVOLUTION_API_KEY en .env}"
+      EVOLUTION_INSTANCE: "${EVOLUTION_INSTANCE:-forwardvision}"
+      EVOLUTION_WEBHOOK_SECRET: "${EVOLUTION_WEBHOOK_SECRET:?Define EVOLUTION_WEBHOOK_SECRET en .env}"
     networks:
       - shared-infra
     labels:
@@ -24,6 +28,33 @@ services:
       - "traefik.http.routers.ventas.tls.certresolver=myresolver" # Matches central traefik config
       - "traefik.http.services.ventas.loadbalancer.server.port=3000"
 
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.3.7
+    container_name: evolution-api
+    restart: unless-stopped
+    environment:
+      AUTHENTICATION_API_KEY: "${EVOLUTION_API_KEY:?Define EVOLUTION_API_KEY en .env}"
+      SERVER_URL: "http://evolution-api:8080"
+      DEL_INSTANCE: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - shared-infra
+
+  prisma-migrate:
+    build:
+      context: .
+      target: migrate
+    profiles:
+      - migrations
+    environment:
+      DATABASE_URL: "mysql://root:${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}@mysql_central:3306/ventas_control"
+    networks:
+      - shared-infra
+
 networks:
   shared-infra:
     external: true
+
+volumes:
+  evolution_instances:

@@ -19,7 +19,7 @@ export default function LandingPage() {
           </span>
         </h1>
         <p style={{ fontSize: "1.05rem", color: "#94a3b8", lineHeight: 1.7, marginBottom: "32px" }}>
-          Plataforma para gestionar clientes de internet, contratos, mensualidades, pagos y recordatorios manuales por WhatsApp.
+          Plataforma para gestionar clientes de internet, contratos, mensualidades, pagos y recordatorios por WhatsApp.
         </p>
         <Link href="/login">
           <button style={{ background: "linear-gradient(135deg, #1e40af, #06b6d4)", border: "none", color: "#fff", padding: "16px 36px", borderRadius: "12px", fontSize: "1.05rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "10px", boxShadow: "0 8px 24px rgba(6,182,212,.35)" }}>
@@ -54,7 +54,7 @@ export default function LandingPage() {
             <div style={{ width: "44px", height: "44px", background: "rgba(16,185,129,.2)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px", fontSize: "1.3rem" }}>🧑‍💼</div>
             <div style={{ fontSize: ".72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#10b981", marginBottom: "8px" }}>Asesor de Ventas</div>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "12px" }}>Gestión de clientes</h3>
-            {["Registrar y editar clientes", "Confirmar pagos", "Enviar recordatorios manuales por WhatsApp", "Importar Excel y descargar PDF", "Consultar ventas por mes"].map(f => (
+            {["Registrar y editar clientes", "Confirmar pagos", "Enviar recordatorios por WhatsApp", "Importar Excel y descargar PDF", "Consultar ventas por mes"].map(f => (
               <div key={f} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: ".85rem", color: "#94a3b8", marginBottom: "6px" }}>
                 <FiCheckCircle size={14} color="#10b981" />{f}
               </div>
@@ -82,7 +82,7 @@ export default function LandingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px" }}>
             {[
               { icon: <FiFileText />, title: "Contrato PDF", desc: "Condiciones visibles, firmas digitales y descarga para el cliente." },
-              { icon: <FiMessageSquare color="#25d366" />, title: "WhatsApp", desc: "Mensaje de pago preparado para que el asesor lo revise y lo envíe manualmente." },
+              { icon: <FiMessageSquare color="#25d366" />, title: "WhatsApp", desc: "Avisos automáticos con consentimiento del cliente y mensajes manuales desde la ficha." },
               { icon: <FiDownload />, title: "Excel & PDF", desc: "Importa clientes desde Excel y descarga reportes en PDF con un clic." },
               { icon: <FiDollarSign color="#10b981" />, title: "Control de Pagos", desc: "Gestiona pagos mensuales, confirma recibos y ve el historial completo." },
             ].map((f, i) => (

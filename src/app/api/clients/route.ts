@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     include: {
       contract: {
         include: {
-          receipts: { orderBy: { monthNumber: 'asc' } },
+          receipts: { orderBy: { dueDate: 'asc' } },
           clientUser: { select: { id: true, username: true, fullName: true } },
         },
       },

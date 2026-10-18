@@ -21,13 +21,57 @@ interface ClientRecord {
     contractNumber: string;
     monthlyAmount: number;
     status: string;
-    receipts: { id: number; status: string }[];
+    receipts: { id: number; status: string; dueDate: string }[];
   } | null;
 }
 
 const currentMonth = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const dateKey = (value: string) => {
+  const date = new Date(value);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+};
+
+const todayKey = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
+
+const formatDueDate = (value: string) => {
+  const [year, month, day] = dateKey(value).split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("es-PE");
+};
+
+const getPaymentStatus = (client: ClientRecord) => {
+  const receipts = client.contract?.receipts ?? [];
+  const unpaid = receipts.filter((receipt) => receipt.status !== "PAID");
+  const today = todayKey();
+  const overdue = unpaid
+    .filter((receipt) => receipt.status === "OVERDUE" || dateKey(receipt.dueDate) < today)
+    .sort((left, right) => dateKey(left.dueDate).localeCompare(dateKey(right.dueDate)))[0];
+
+  if (overdue) return { key: "overdue", label: "Vencido", dueDate: overdue.dueDate };
+
+  const nextDue = unpaid
+    .filter((receipt) => dateKey(receipt.dueDate) >= today)
+    .sort((left, right) => dateKey(left.dueDate).localeCompare(dateKey(right.dueDate)))[0];
+  if (nextDue) {
+    const todayTimestamp = new Date(`${today}T00:00:00Z`).getTime();
+    const daysUntilDue = (new Date(`${dateKey(nextDue.dueDate)}T00:00:00Z`).getTime() - todayTimestamp) / 86_400_000;
+    if (daysUntilDue <= 5) return { key: "due-soon", label: "Por vencer", dueDate: nextDue.dueDate };
+    return { key: "current", label: "Al día", dueDate: nextDue.dueDate };
+  }
+
+  return { key: "current", label: receipts.length > 0 ? "Al día" : "Sin pagos", dueDate: undefined };
 };
 
 const valueFor = (row: Record<string, unknown>, aliases: string[]) => {
@@ -42,7 +86,7 @@ export default function SellerClients() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [month, setMonth] = useState(currentMonth());
+  const [month, setMonth] = useState("all");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -230,31 +274,57 @@ export default function SellerClients() {
       <p style={{ margin: "-4px 0 14px", color: "var(--text-light)", fontSize: ".78rem" }}>
         Excel: columnas nombres, dni, telefono, direccion, plan y mensualidad. Acceso inicial del cliente: usuario y contraseña iguales al DNI.
       </p>
+      <div className="client-status-legend" aria-label="Estados de pago">
+        <span className="client-status-badge client-status-badge--overdue">Rojo: vencido</span>
+        <span className="client-status-badge client-status-badge--due-soon">Amarillo: vence en 5 días</span>
+        <span className="client-status-badge client-status-badge--current">Verde: al día</span>
+      </div>
       {loading ? (
         <div style={{ textAlign: "center", padding: 36 }}><div className="spinner" /></div>
       ) : filtered.length === 0 ? (
         <div className="card" style={{ textAlign: "center", color: "var(--text-light)" }}>No se encontraron clientes.</div>
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
-          {filtered.map((client) => (
-            <article key={client.id} className="card" style={{ display: "flex", alignItems: "center", gap: 12, margin: 0, padding: 15 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, color: "var(--fv-navy)" }}>{client.names}</div>
-                <div style={{ fontSize: ".8rem", color: "var(--text-light)", marginTop: 4 }}>DNI {client.dni} · {client.phone} · {client.internetPlan || "Sin plan"}</div>
-                <div style={{ fontSize: ".8rem", color: "var(--text-light)", marginTop: 3 }}>
-                  {client.contract?.contractNumber ?? "Sin contrato"} · S/ {client.contract?.monthlyAmount.toFixed(2) ?? "0.00"} / mes
+          {filtered.map((client) => {
+            const paymentStatus = getPaymentStatus(client);
+            return (
+              <article key={client.id} className={`card client-status-card client-status-card--${paymentStatus.key}`}>
+                <div className="client-list-main">
+                  <div className="client-list-identity">
+                    <div style={{ fontWeight: 700, color: "var(--fv-navy)" }}>{client.names}</div>
+                    <div style={{ fontSize: ".8rem", color: "var(--text-light)", marginTop: 4 }}>
+                      {client.contract?.contractNumber ?? "Sin contrato"} · S/ {client.contract?.monthlyAmount.toFixed(2) ?? "0.00"} / mes
+                    </div>
+                  </div>
+                  <span className={`client-status-badge client-status-badge--${paymentStatus.key}`}>{paymentStatus.label}</span>
+                  <div className="clients-full-details">
+                    <span>DNI {client.dni}</span>
+                    <span>{client.phone}</span>
+                    <span>{client.internetPlan || "Sin plan"}</span>
+                    <span>{client.address}</span>
+                    <span>{paymentStatus.dueDate
+                      ? `${paymentStatus.key === "overdue" ? "Vencido desde" : "Vence"} ${formatDueDate(paymentStatus.dueDate)}`
+                      : "Sin vencimiento próximo"}</span>
+                  </div>
+                  <div className="clients-mobile-summary">
+                    {paymentStatus.dueDate
+                      ? `${paymentStatus.key === "overdue" ? "Vencido desde" : "Vence"} ${formatDueDate(paymentStatus.dueDate)}`
+                      : client.phone}
+                  </div>
+                  <div className="client-list-actions">
+                    {client.contract && (
+                      <Link href={`/seller/clientes/${client.contract.id}`} className="btn-outline" style={{ whiteSpace: "nowrap", textDecoration: "none", padding: "8px 10px" }}>
+                        Ver ficha
+                      </Link>
+                    )}
+                    <button type="button" className="btn-danger" onClick={() => void deleteClient(client)} aria-label={`Eliminar a ${client.names}`} style={{ padding: 9 }}>
+                      <FiTrash2 />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              {client.contract && (
-                <Link href={`/seller/clientes/${client.contract.id}`} className="btn-outline" style={{ whiteSpace: "nowrap", textDecoration: "none", padding: "8px 10px" }}>
-                  Ver ficha
-                </Link>
-              )}
-              <button type="button" className="btn-danger" onClick={() => void deleteClient(client)} aria-label={`Eliminar a ${client.names}`} style={{ padding: 9 }}>
-                <FiTrash2 />
-              </button>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
