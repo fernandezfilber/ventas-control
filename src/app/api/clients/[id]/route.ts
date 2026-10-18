@@ -69,8 +69,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   try {
     const updateData: Record<string, unknown> = {};
-    for (const field of ['names', 'dni', 'phone', 'address', 'locationLink', 'internetPlan', 'details']) {
+    for (const field of [
+      'names', 'dni', 'phone', 'address', 'locationLink', 'internetPlan',
+      'details', 'installationTimeRange',
+    ]) {
       if (typeof data[field] === 'string') updateData[field] = data[field].trim();
+    }
+    if (typeof data.installationDate === 'string') {
+      const value = data.installationDate.trim();
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+      const year = match ? Number(match[1]) : 0;
+      const month = match ? Number(match[2]) : 0;
+      const day = match ? Number(match[3]) : 0;
+      const parsed = match ? new Date(Date.UTC(year, month - 1, day)) : null;
+      if (!parsed ||
+        parsed.getUTCFullYear() !== year ||
+        parsed.getUTCMonth() !== month - 1 ||
+        parsed.getUTCDate() !== day) {
+        return NextResponse.json({ message: 'La fecha de instalación debe tener formato AAAA-MM-DD válido.' }, { status: 400 });
+      }
+      updateData.installationDate = value;
+      updateData.installedAt = parsed;
     }
     if (Object.keys(updateData).length === 0 && data.monthlyAmount === undefined) {
       return NextResponse.json({ message: 'No hay cambios para guardar' }, { status: 400 });
@@ -103,6 +122,43 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           where: { contractId: existing.contract.id, status: 'PENDING' },
           data: { amount: monthlyAmount },
         });
+      }
+      if (updateData.installedAt instanceof Date && existing.contract) {
+        const startDate = updateData.installedAt;
+        const paymentDay = startDate.getUTCDate();
+        const endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 3, 1));
+        endDate.setUTCDate(Math.min(
+          paymentDay,
+          new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0)).getUTCDate(),
+        ));
+        await tx.contract.update({
+          where: { id: existing.contract.id },
+          data: { startDate, endDate, paymentDay },
+        });
+        const unpaidReceipts = await tx.receipt.findMany({
+          where: { contractId: existing.contract.id, status: { not: 'PAID' } },
+          select: { id: true, monthNumber: true },
+        });
+        for (const receipt of unpaidReceipts) {
+          const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + receipt.monthNumber, 1));
+          dueDate.setUTCDate(Math.min(
+            paymentDay,
+            new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
+          ));
+          const today = new Date();
+          today.setUTCHours(0, 0, 0, 0);
+          await tx.receipt.update({
+            where: { id: receipt.id },
+            data: {
+              dueDate,
+              status: dueDate < today ? 'OVERDUE' : 'PENDING',
+              reminderFiveDaysSentAt: null,
+              reminderDueDateSentAt: null,
+              reminderClaimedAt: null,
+              reminderClaimedStage: null,
+            },
+          });
+        }
       }
       return tx.sale.findUnique({
         where: { id: saleId },

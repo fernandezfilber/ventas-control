@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       : null;
     const startedAt = parsedInstallationDate ?? new Date();
 
-    if (!names || !/^\d{8,12}$/.test(dni) || !phone || !address ||
+    if (!names || !/^\d{7,12}$/.test(dni) || !address ||
       (installationDate !== null && (!installationDateMatch ||
         parsedInstallationDate?.getUTCFullYear() !== installationYear ||
         parsedInstallationDate?.getUTCMonth() !== installationMonth ||
@@ -135,8 +135,9 @@ export async function POST(req: Request) {
       existingUser.sellerId !== sellerId) {
       return NextResponse.json({ message: 'El cliente ya está asignado a otro asesor.' }, { status: 409 });
     }
+    const effectivePhone = phone || existingUser?.phone || '';
     const existingSale = await prisma.sale.findFirst({ where: { dni }, select: { id: true } });
-    if (existingSale) {
+    if (existingSale && data.additionalService !== true) {
       return NextResponse.json({ message: 'Ya existe un servicio registrado con ese DNI.' }, { status: 409 });
     }
 
@@ -156,7 +157,7 @@ export async function POST(req: Request) {
             where: { id: existingUser.id },
             data: {
               fullName: names,
-              phone,
+              ...(phone ? { phone } : {}),
               ...(existingUser.sellerId === null && sellerId !== null ? { sellerId } : {}),
             },
           })
@@ -166,7 +167,7 @@ export async function POST(req: Request) {
           password,
           role: 'CLIENT',
           fullName: names,
-          phone,
+          phone: effectivePhone || null,
           sellerId,
             },
           });
@@ -194,10 +195,11 @@ export async function POST(req: Request) {
           dni,
           names,
           address,
-          phone,
+          phone: effectivePhone,
           locationLink: typeof data.locationLink === 'string' ? data.locationLink.trim() : '',
           referencePhotos: '',
           installationDate,
+          installationTimeRange: typeof data.installationTimeRange === 'string' ? data.installationTimeRange.trim() : null,
           internetPlan: typeof data.internetPlan === 'string' ? data.internetPlan.trim() : null,
           details: typeof data.details === 'string' ? data.details.trim() : null,
           sellerNameOrId: sellerUser?.fullName || sellerUser?.username || auth.fullName || auth.username,

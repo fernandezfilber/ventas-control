@@ -82,6 +82,34 @@ const valueFor = (row: Record<string, unknown>, aliases: string[]) => {
   return key ? String(normalized[key] ?? "").trim() : "";
 };
 
+const dateFor = (row: Record<string, unknown>, aliases: string[]) => {
+  const normalized = Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, ""), value])
+  );
+  const key = aliases.find((alias) => normalized[alias] !== undefined);
+  if (!key) return "";
+
+  const value = normalized[key];
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  }
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      return `${String(parsed.y).padStart(4, "0")}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+    }
+  }
+
+  const text = String(value ?? "").trim();
+  const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (isoDate) return text;
+  const localDate = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(text);
+  if (localDate) {
+    return `${localDate[3]}-${localDate[2].padStart(2, "0")}-${localDate[1].padStart(2, "0")}`;
+  }
+  return text;
+};
+
 export default function SellerClients() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,8 +226,12 @@ export default function SellerClients() {
           dni: valueFor(row, ["dni", "documento", "numerodocumento"]),
           phone: valueFor(row, ["telefono", "celular", "phone"]),
           address: valueFor(row, ["direccion", "address"]),
-          internetPlan: valueFor(row, ["plan", "internetplan"]),
-          monthlyAmount: valueFor(row, ["mensualidad", "montomensual", "monthlyamount", "monto"]),
+          internetPlan: valueFor(row, ["plan", "internetplan"]) || "Plan básico 250 Mbps",
+          monthlyAmount: valueFor(row, ["mensualidad", "montomensual", "monthlyamount", "monto"]) || "50",
+          installationDate: dateFor(row, ["fechainstalacion", "fechadeinstalacion", "installationdate"]),
+          installationTimeRange: valueFor(row, ["horainstalacion", "horario", "installationtimerange"]),
+          details: valueFor(row, ["detalles", "referencia", "observaciones", "details"]),
+          additionalService: valueFor(row, ["servicioadicional", "additionalservice"]).toLowerCase() === "si",
         };
         const response = await fetch("/api/clients", {
           method: "POST",
@@ -272,7 +304,7 @@ export default function SellerClients() {
 
       {importResult && <p role="status" style={{ marginBottom: 14, color: "var(--fv-navy)", fontSize: ".85rem" }}>{importResult}</p>}
       <p style={{ margin: "-4px 0 14px", color: "var(--text-light)", fontSize: ".78rem" }}>
-        Excel: columnas nombres, dni, telefono, direccion, plan y mensualidad. Acceso inicial del cliente: usuario y contraseña iguales al DNI.
+        Excel: columnas nombres, dni, telefono, direccion, plan, mensualidad y fecha_instalacion (opcional; formato AAAA-MM-DD). Para otra instalación del mismo DNI, marca servicio_adicional como SI. Acceso inicial: usuario y contraseña iguales al DNI.
       </p>
       <div className="client-status-legend" aria-label="Estados de pago">
         <span className="client-status-badge client-status-badge--overdue">Rojo: vencido</span>

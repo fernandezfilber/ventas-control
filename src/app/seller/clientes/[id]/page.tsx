@@ -28,7 +28,19 @@ interface Contract {
   monthlyAmount: number;
   sellerSignature: string | null;
   clientSignature: string | null;
-  sale: { id: number; names: string; dni: string; address: string; phone: string; internetPlan: string | null; locationLink: string; details: string | null };
+  sale: {
+    id: number;
+    names: string;
+    dni: string;
+    address: string;
+    phone: string;
+    internetPlan: string | null;
+    locationLink: string;
+    details: string | null;
+    installationDate: string | null;
+    installationTimeRange: string | null;
+    installedAt: string | null;
+  };
   clientUser: { id: number; username: string } | null;
   receipts: Receipt[];
 }
@@ -73,7 +85,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   const [linking, setLinking] = useState(false);
   const [editingClient, setEditingClient] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
-  const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", monthlyAmount: "", details: "" });
+  const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", monthlyAmount: "", details: "", installationDate: "", installationTimeRange: "" });
   const [signing, setSigning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -138,6 +150,9 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
             internetPlan: data.sale.internetPlan || "",
             monthlyAmount: String(data.monthlyAmount),
             details: data.sale.details || "",
+            installationDate: data.sale.installationDate ||
+              (data.sale.installedAt || data.startDate).slice(0, 10),
+            installationTimeRange: data.sale.installationTimeRange || "",
           });
           if (data.clientUser) void refreshPaymentProofs(data.clientUser.id);
         }
@@ -448,7 +463,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                 </div>
                 <div className="form-group">
                   <label>Teléfono</label>
-                  <input required type="tel" value={clientData.phone} onChange={(event) => setClientData({ ...clientData, phone: event.target.value })} />
+                  <input type="tel" value={clientData.phone} onChange={(event) => setClientData({ ...clientData, phone: event.target.value })} />
                 </div>
                 <div className="form-group">
                   <label>Dirección</label>
@@ -456,7 +471,15 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                 </div>
                 <div className="form-group">
                   <label>Ubicación en mapa</label>
-                  <input required type="url" value={clientData.locationLink} onChange={(event) => setClientData({ ...clientData, locationLink: event.target.value })} />
+                  <input type="url" value={clientData.locationLink} onChange={(event) => setClientData({ ...clientData, locationLink: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Fecha de instalación</label>
+                  <input required type="date" value={clientData.installationDate} onChange={(event) => setClientData({ ...clientData, installationDate: event.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Horario de instalación</label>
+                  <input value={clientData.installationTimeRange} onChange={(event) => setClientData({ ...clientData, installationTimeRange: event.target.value })} />
                 </div>
                 <div className="form-group">
                   <label>Plan de internet</label>
