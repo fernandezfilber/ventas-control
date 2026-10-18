@@ -101,7 +101,12 @@ export async function PUT(
               create: [1, 2, 3].map((month) => {
                 const dueDate = new Date(startDate);
                 dueDate.setMonth(dueDate.getMonth() + month);
-                return { monthNumber: month, dueDate, amount: monthlyAmount };
+                return {
+                  monthNumber: month,
+                  dueDate,
+                  amount: monthlyAmount,
+                  ...(month === 1 ? { status: 'PAID', paidAt: startDate } : {}),
+                };
               }),
             },
           },

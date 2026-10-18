@@ -189,6 +189,22 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     }
   };
 
+  const handleUnmarkPaid = async (receiptId: number) => {
+    if (!confirm("¿Deshacer el pago marcado? El recibo quedará pendiente o vencido y podrá recibir recordatorios si corresponde.")) return;
+
+    try {
+      const res = await fetch(`/api/receipts/${receiptId}/pay`, { method: "PATCH" });
+      if (res.ok) {
+        if (contract?.clientUser) await refreshPaymentProofs(contract.clientUser.id);
+        refreshContract();
+      } else {
+        alert("No se pudo deshacer el pago.");
+      }
+    } catch {
+      alert("Error de red");
+    }
+  };
+
   const handleReviewPaymentProof = async (proof: PaymentProof, action: "approve" | "reject") => {
     const receiptId = Number(proofReceiptSelections[proof.id]);
     if (action === "approve" && (!Number.isInteger(receiptId) || receiptId <= 0)) {
@@ -637,8 +653,15 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-light)" }}>
-                    {new Date(r.paidAt!).toLocaleDateString()}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-light)" }}>
+                      {r.paidAt ? new Date(r.paidAt).toLocaleDateString() : "Pagado"}
+                    </div>
+                    {canConfirmPayments && (
+                      <button onClick={() => handleUnmarkPaid(r.id)} className="btn-outline" style={{ padding: "6px 12px", fontSize: "0.75rem", borderRadius: "6px" }}>
+                        Desmarcar como pagado
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

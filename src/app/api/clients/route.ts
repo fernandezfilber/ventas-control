@@ -178,7 +178,12 @@ export async function POST(req: Request) {
           paymentDay,
           new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
         ));
-        return { monthNumber: month, dueDate, amount: monthlyAmount };
+        return {
+          monthNumber: month,
+          dueDate,
+          amount: monthlyAmount,
+          ...(month === 1 ? { status: 'PAID', paidAt: startedAt } : {}),
+        };
       });
 
       return tx.sale.create({
