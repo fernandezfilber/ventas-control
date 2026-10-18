@@ -43,7 +43,7 @@ La primera hoja del archivo debe incluir estas columnas: `nombres`, `dni`, `tele
 
 ## Despliegue en Docker
 
-Configura un archivo `.env` en el servidor con las credenciales de MySQL, un `JWT_SECRET` aleatorio, un `CRON_SECRET` aleatorio y un `EVOLUTION_API_KEY` aleatorio (el mismo valor autentica a Evolution API y a la aplicación). No lo subas al repositorio. La aplicación se conecta a la base `ventas_control` en el servidor MySQL `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`. Evolution API puede usar el mismo servidor MySQL, pero debe conectarse a una base separada (en este despliegue, `evolution_db`) y un usuario dedicado; no apuntes Evolution a `ventas_control`.
+Configura un archivo `.env` en el servidor con las credenciales de MySQL, un `JWT_SECRET` aleatorio, un `CRON_SECRET` aleatorio y un `EVOLUTION_API_KEY` aleatorio (el mismo valor autentica a Evolution API y a la aplicación). No lo subas al repositorio. La aplicación se conecta a la base `ventas_control` en el servidor MySQL `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`. Evolution API comparte ese servicio Redis usando la contraseña `REDIS_PASSWORD` del `.env` y un prefijo de caché propio (`evolution`). No hace falta crear otro contenedor Redis. Evolution API puede usar el mismo servidor MySQL, pero debe conectarse a una base separada (en este despliegue, `evolution_db`) y un usuario dedicado; no apuntes Evolution a `ventas_control`.
 
 Antes de desplegar Evolution por primera vez, crea una base vacía y un usuario con permisos solo sobre esa base en el servidor MySQL. Por ejemplo, en una sesión MySQL administrativa:
 

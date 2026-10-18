@@ -39,6 +39,10 @@ services:
       DATABASE_PROVIDER: "mysql"
       DATABASE_CONNECTION_URI: "${EVOLUTION_DATABASE_URL:?Define EVOLUTION_DATABASE_URL en .env}"
       DATABASE_CONNECTION_CLIENT_NAME: "evolution_api"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://:${REDIS_PASSWORD:?Define REDIS_PASSWORD en .env}@redis_central:6379/6"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      CACHE_REDIS_SAVE_INSTANCES: "false"
       DEL_INSTANCE: "false"
     volumes:
       - evolution_instances:/evolution/instances
