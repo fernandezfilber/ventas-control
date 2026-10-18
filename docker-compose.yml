@@ -35,6 +35,10 @@ services:
     environment:
       AUTHENTICATION_API_KEY: "${EVOLUTION_API_KEY:?Define EVOLUTION_API_KEY en .env}"
       SERVER_URL: "http://evolution-api:8080"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "mysql"
+      DATABASE_CONNECTION_URI: "${EVOLUTION_DATABASE_URL:?Define EVOLUTION_DATABASE_URL en .env}"
+      DATABASE_CONNECTION_CLIENT_NAME: "evolution_api"
       DEL_INSTANCE: "false"
     volumes:
       - evolution_instances:/evolution/instances

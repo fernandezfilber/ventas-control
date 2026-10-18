@@ -43,7 +43,17 @@ La primera hoja del archivo debe incluir estas columnas: `nombres`, `dni`, `tele
 
 ## Despliegue en Docker
 
-Configura un archivo `.env` en el servidor con las credenciales de MySQL, un `JWT_SECRET` aleatorio, un `CRON_SECRET` aleatorio y un `EVOLUTION_API_KEY` aleatorio (el mismo valor autentica a Evolution API y a la aplicación). No lo subas al repositorio. La aplicación se conecta a `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`. Evolution API se ejecuta como servicio interno y conserva la sesión de WhatsApp en un volumen Docker.
+Configura un archivo `.env` en el servidor con las credenciales de MySQL, un `JWT_SECRET` aleatorio, un `CRON_SECRET` aleatorio y un `EVOLUTION_API_KEY` aleatorio (el mismo valor autentica a Evolution API y a la aplicación). No lo subas al repositorio. La aplicación se conecta a la base `ventas_control` en el servidor MySQL `mysql_central:3306` y Redis en `redis_central:6379` dentro de la red Docker externa `shared-infra`. Evolution API puede usar el mismo servidor MySQL, pero debe conectarse a una base separada (en este despliegue, `evolution_db`) y un usuario dedicado; no apuntes Evolution a `ventas_control`.
+
+Antes de desplegar Evolution por primera vez, crea una base vacía y un usuario con permisos solo sobre esa base en el servidor MySQL. Por ejemplo, en una sesión MySQL administrativa:
+
+```sql
+CREATE DATABASE evolution_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'evolution'@'%' IDENTIFIED BY 'REEMPLAZA_CON_UNA_CLAVE_ALEATORIA';
+GRANT ALL PRIVILEGES ON evolution_db.* TO 'evolution'@'%';
+```
+
+Pon la URI correspondiente en `EVOLUTION_DATABASE_URL` del `.env` privado (por ejemplo, `mysql://evolution:CLAVE_CODIFICADA@mysql_central:3306/evolution_db`); codifica los caracteres reservados de la contraseña para URL. Si `evolution_db` ya existe, no ejecutes `CREATE DATABASE` de nuevo. Evolution creará sus tablas en esa base durante el arranque. Si los logs muestran `ventas_control`, el contenedor aún está usando una configuración antigua o se está desplegando otro archivo Compose: corrige esa conexión antes de reintentar. No borres tablas ni ejecutes un baseline sobre `ventas_control`.
 
 Después del primer despliegue, crea la instancia Baileys `forwardvision` en Evolution API (`POST /instance/create`, con `instanceName: "forwardvision"`, `integration: "WHATSAPP-BAILEYS"` y `qrcode: true`), solicita la conexión con `GET /instance/connect/forwardvision` y escanea el QR con el teléfono dedicado. Autentica las solicitudes a Evolution API con el encabezado `apikey` y `EVOLUTION_API_KEY`. Mantén el dispositivo conectado y comprueba que la instancia esté en línea. No expongas la API públicamente sin protegerla.
 
