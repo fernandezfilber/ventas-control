@@ -5,6 +5,36 @@ import { cookies } from 'next/headers';
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
+function getLimaDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
+function parseLimaDateKey(key: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null;
+  return date;
+}
+
+function getLimaDateBoundary(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 5));
+}
+
 async function getAuthUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get('auth-token')?.value;
@@ -87,6 +117,7 @@ export async function GET(req: Request) {
     const dni = searchParams.get('dni');
     const date = searchParams.get('date');
     const month = searchParams.get('month');
+    const period = searchParams.get('period');
     const status = searchParams.get('status');
 
     const where: Record<string, unknown> = {};
@@ -109,25 +140,38 @@ export async function GET(req: Request) {
     }
 
     if (date) {
-      const startDate = new Date(date);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(date);
-      endDate.setHours(23, 59, 59, 999);
+      const startDay = parseLimaDateKey(date);
+      if (!startDay) return NextResponse.json({ message: 'Fecha inválida' }, { status: 400 });
+      const endDay = new Date(Date.UTC(startDay.getUTCFullYear(), startDay.getUTCMonth(), startDay.getUTCDate() + 1));
 
       where.createdAt = {
-        gte: startDate,
-        lte: endDate,
+        gte: getLimaDateBoundary(startDay),
+        lt: getLimaDateBoundary(endDay),
       };
     }
 
-    if (month) {
+    if (!date && month) {
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
         return NextResponse.json({ message: 'Mes inválido' }, { status: 400 });
       }
       const [year, monthNumber] = month.split('-').map(Number);
       where.createdAt = {
-        gte: new Date(year, monthNumber - 1, 1),
-        lt: new Date(year, monthNumber, 1),
+        gte: getLimaDateBoundary(new Date(Date.UTC(year, monthNumber - 1, 1))),
+        lt: getLimaDateBoundary(new Date(Date.UTC(year, monthNumber, 1))),
+      };
+    } else if (!date && !month && period) {
+      if (!['day', 'week', 'month'].includes(period)) {
+        return NextResponse.json({ message: 'Periodo inválido' }, { status: 400 });
+      }
+      const today = parseLimaDateKey(getLimaDateKey());
+      if (!today) throw new Error('No se pudo calcular la fecha de Lima.');
+      const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+      if (period === 'week') start.setUTCDate(start.getUTCDate() - 6);
+      if (period === 'month') start.setUTCDate(1);
+      const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1));
+      where.createdAt = {
+        gte: getLimaDateBoundary(start),
+        lt: getLimaDateBoundary(end),
       };
     }
 

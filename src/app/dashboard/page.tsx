@@ -45,6 +45,7 @@ export default function DashboardVentas() {
   const [filterDni, setFilterDni] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
+  const [period, setPeriod] = useState("month");
   const [filterStatus, setFilterStatus] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -54,6 +55,7 @@ export default function DashboardVentas() {
     if (filterDni) params.set("dni", filterDni);
     if (filterDate) params.set("date", filterDate);
     if (filterMonth) params.set("month", filterMonth);
+    if (!filterDate && !filterMonth) params.set("period", period);
     if (filterStatus) params.set("status", filterStatus);
 
     fetch(`/api/sales?${params.toString()}`)
@@ -80,7 +82,7 @@ export default function DashboardVentas() {
     return () => {
       active = false;
     };
-  }, [filterDni, filterDate, filterMonth, filterStatus, refreshKey]);
+  }, [filterDni, filterDate, filterMonth, period, filterStatus, refreshKey]);
 
   const downloadSalesPdf = () => {
     const doc = new jsPDF();
@@ -89,7 +91,8 @@ export default function DashboardVentas() {
     doc.text("ForwardVision", 14, 18);
     doc.setFontSize(11);
     doc.setTextColor(30, 30, 30);
-    doc.text(`Reporte de ventas${filterMonth ? ` - ${filterMonth}` : filterDate ? ` - ${filterDate}` : ""}`, 14, 28);
+    const periodLabel = filterDate || filterMonth || (period === "day" ? "Hoy" : period === "week" ? "Últimos 7 días" : "Este mes");
+    doc.text(`Reporte de ventas - ${periodLabel}`, 14, 28);
     doc.setFontSize(9);
 
     let y = 40;
@@ -106,7 +109,7 @@ export default function DashboardVentas() {
       doc.text(lines, 14, y);
       y += lines.length * 5 + 4;
     });
-    doc.save(`Ventas_${filterMonth || filterDate || "todas"}.pdf`);
+    doc.save(`Ventas_${filterMonth || filterDate || period}.pdf`);
   };
 
   const handleMarkInstalled = async (sale: Sale) => {
@@ -177,6 +180,27 @@ export default function DashboardVentas() {
   return (
     <div>
       <h2 style={{ marginBottom: '20px', color: 'var(--primary-color)' }}>Panel de Ventas (Instalaciones)</h2>
+
+      <div className="tab-bar" role="group" aria-label="Filtrar rendimiento por periodo">
+        {[
+          { value: "day", label: "Hoy" },
+          { value: "week", label: "Semana" },
+          { value: "month", label: "Mes" },
+        ].map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => {
+              setPeriod(option.value);
+              setFilterDate("");
+              setFilterMonth("");
+            }}
+            className={`tab-btn ${!filterDate && !filterMonth && period === option.value ? "active" : ""}`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       
       {/* Summary Cards */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -194,7 +218,7 @@ export default function DashboardVentas() {
         </div>
         <div className="card" style={{ flex: 1, minWidth: '180px', background: '#e0f2fe', borderLeft: '4px solid #06b6d4', padding: '15px' }}>
           <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#0f1b3d' }}>S/ {monthlyRevenue.toFixed(2)}</div>
-          <div style={{ fontSize: '0.85rem', color: '#0f1b3d' }}>Mensualidades de ventas listadas</div>
+          <div style={{ fontSize: '0.85rem', color: '#0f1b3d' }}>Mensualidades de ventas listadas en el periodo</div>
         </div>
       </div>
 

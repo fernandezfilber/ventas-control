@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { getContractDueDate, getContractEndDate } from '@/lib/contract-dates';
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
@@ -161,11 +162,7 @@ export async function POST(req: Request) {
 
     const password = await bcrypt.hash(dni, 10);
     const paymentDay = startedAt.getUTCDate();
-    const endDate = new Date(Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth() + 3, 1));
-    endDate.setUTCDate(Math.min(
-      paymentDay,
-      new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0)).getUTCDate(),
-    ));
+    const endDate = getContractEndDate(startedAt);
 
     const sale = await prisma.$transaction(async (tx) => {
       const lastSale = await tx.sale.findFirst({ orderBy: { id: 'desc' }, select: { id: true } });
@@ -192,11 +189,7 @@ export async function POST(req: Request) {
       const contractNumber = `FV-${startedAt.getUTCFullYear()}-${String((lastContract?.id ?? 0) + 1).padStart(4, '0')}`;
       const correlativeId = String((lastSale?.id ?? 0) + 1).padStart(4, '0');
       const receipts = [1, 2, 3].map((month) => {
-        const dueDate = new Date(Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth() + month - 1, 1));
-        dueDate.setUTCDate(Math.min(
-          paymentDay,
-          new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
-        ));
+        const dueDate = getContractDueDate(startedAt, month);
         return {
           monthNumber: month,
           dueDate,

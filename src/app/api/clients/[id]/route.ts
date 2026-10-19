@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { getContractDueDate, getContractEndDate } from '@/lib/contract-dates';
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
@@ -126,11 +127,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (updateData.installedAt instanceof Date && existing.contract) {
         const startDate = updateData.installedAt;
         const paymentDay = startDate.getUTCDate();
-        const endDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 3, 1));
-        endDate.setUTCDate(Math.min(
-          paymentDay,
-          new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0)).getUTCDate(),
-        ));
+        const endDate = getContractEndDate(startDate);
         await tx.contract.update({
           where: { id: existing.contract.id },
           data: { startDate, endDate, paymentDay },
@@ -140,11 +137,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           select: { id: true, monthNumber: true, status: true },
         });
         for (const receipt of unpaidReceipts) {
-          const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + receipt.monthNumber - 1, 1));
-          dueDate.setUTCDate(Math.min(
-            paymentDay,
-            new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
-          ));
+          const dueDate = getContractDueDate(startDate, receipt.monthNumber);
           if (receipt.status === 'PAID') {
             await tx.receipt.update({
               where: { id: receipt.id },

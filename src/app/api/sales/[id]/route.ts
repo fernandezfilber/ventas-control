@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { getContractDueDate, getContractEndDate, getContractStartDate } from '@/lib/contract-dates';
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
@@ -78,10 +79,9 @@ export async function PUT(
 
       if (!existingContract) {
         const monthlyAmount = data.monthlyAmount;
-        const startDate = installedAt;
-        const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + 3);
-        const paymentDay = startDate.getDate();
+        const startDate = getContractStartDate(existingSale.installationDate, installedAt);
+        const endDate = getContractEndDate(startDate);
+        const paymentDay = startDate.getUTCDate();
 
         const lastContract = await prisma.contract.findFirst({ orderBy: { id: 'desc' } });
         const nextNum = lastContract ? lastContract.id + 1 : 1;
@@ -99,11 +99,7 @@ export async function PUT(
             paymentDay,
             receipts: {
               create: [1, 2, 3].map((month) => {
-                const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + month - 1, 1));
-                dueDate.setUTCDate(Math.min(
-                  paymentDay,
-                  new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
-                ));
+                const dueDate = getContractDueDate(startDate, month);
                 return {
                   monthNumber: month,
                   dueDate,

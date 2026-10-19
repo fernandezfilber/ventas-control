@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { getContractDueDate, getContractEndDate, getContractStartDate } from '@/lib/contract-dates';
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
@@ -73,10 +74,9 @@ export async function POST(req: Request) {
     const existing = await prisma.contract.findUnique({ where: { saleId } });
     if (existing) return NextResponse.json({ message: 'Ya existe un contrato para esta venta' }, { status: 409 });
 
-    const startDate = sale.installedAt || new Date();
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 3);
-    const paymentDay = startDate.getDate();
+    const startDate = getContractStartDate(sale.installationDate, sale.installedAt || new Date());
+    const endDate = getContractEndDate(startDate);
+    const paymentDay = startDate.getUTCDate();
 
     const lastContract = await prisma.contract.findFirst({ orderBy: { id: 'desc' } });
     const nextNum = lastContract ? lastContract.id + 1 : 1;
@@ -94,11 +94,7 @@ export async function POST(req: Request) {
         paymentDay,
         receipts: {
           create: [1, 2, 3].map((month) => {
-            const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + month - 1, 1));
-            dueDate.setUTCDate(Math.min(
-              paymentDay,
-              new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
-            ));
+            const dueDate = getContractDueDate(startDate, month);
             return {
               monthNumber: month,
               dueDate,
