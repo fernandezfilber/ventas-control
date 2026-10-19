@@ -6,6 +6,17 @@ import { cookies } from 'next/headers';
 
 const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'ventas-control-jwt-secret-prod-2024');
 
+function getLimaDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
 async function getAuth() {
   const cookieStore = await cookies();
   const token = cookieStore.get('auth-token')?.value;
@@ -89,7 +100,7 @@ export async function POST(req: Request) {
     const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
     const installationDate = typeof data.installationDate === 'string' && data.installationDate
       ? data.installationDate
-      : null;
+      : getLimaDateKey();
     const address = typeof data.address === 'string' ? data.address.trim() : '';
     const monthlyAmount = Number(String(data.monthlyAmount ?? '').replace(',', '.'));
     const installationDateMatch = installationDate
@@ -101,18 +112,18 @@ export async function POST(req: Request) {
     const parsedInstallationDate = installationDateMatch
       ? new Date(Date.UTC(installationYear, installationMonth, installationDay))
       : null;
-    const startedAt = parsedInstallationDate ?? new Date();
 
-    if (!names || !/^\d{7,12}$/.test(dni) || !address ||
-      (installationDate !== null && (!installationDateMatch ||
-        parsedInstallationDate?.getUTCFullYear() !== installationYear ||
-        parsedInstallationDate?.getUTCMonth() !== installationMonth ||
-        parsedInstallationDate?.getUTCDate() !== installationDay)) ||
+    if (!names || !/^\d{7,12}$/.test(dni) || !address || !parsedInstallationDate ||
+      !installationDateMatch ||
+      parsedInstallationDate.getUTCFullYear() !== installationYear ||
+      parsedInstallationDate.getUTCMonth() !== installationMonth ||
+      parsedInstallationDate.getUTCDate() !== installationDay ||
       !Number.isFinite(monthlyAmount) || monthlyAmount <= 0) {
       return NextResponse.json({
         message: 'Completa nombre, DNI, teléfono, dirección y un monto mensual válido. La fecha de instalación debe ser válida.',
       }, { status: 400 });
     }
+    const startedAt = parsedInstallationDate;
 
     let sellerId: number | null = auth.role === 'SELLER' ? auth.userId : null;
     if (auth.role === 'ADMIN' && data.sellerId !== undefined && data.sellerId !== null) {

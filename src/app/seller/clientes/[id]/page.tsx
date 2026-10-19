@@ -69,6 +69,31 @@ interface PendingReceiptOption {
   contract: { contractNumber: string };
 }
 
+function getInstallationDate(sale: Contract["sale"], contractStartDate: string) {
+  if (sale.installationDate) return sale.installationDate;
+  if (!sale.installedAt) return contractStartDate.slice(0, 10);
+
+  const installedAt = new Date(sale.installedAt);
+  if (Number.isNaN(installedAt.getTime())) return contractStartDate.slice(0, 10);
+  if (
+    installedAt.getUTCHours() === 0 &&
+    installedAt.getUTCMinutes() === 0 &&
+    installedAt.getUTCSeconds() === 0 &&
+    installedAt.getUTCMilliseconds() === 0
+  ) {
+    return installedAt.toISOString().slice(0, 10);
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(installedAt);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 export default function SellerClientDetail({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = use(params);
@@ -151,8 +176,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
             internetPlan: data.sale.internetPlan || "",
             monthlyAmount: String(data.monthlyAmount),
             details: data.sale.details || "",
-            installationDate: data.sale.installationDate ||
-              (data.sale.installedAt || data.startDate).slice(0, 10),
+            installationDate: getInstallationDate(data.sale, data.startDate),
             installationTimeRange: data.sale.installationTimeRange || "",
           });
           if (data.clientUser) void refreshPaymentProofs(data.clientUser.id);
@@ -194,8 +218,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
             internetPlan: data.sale.internetPlan || "",
             monthlyAmount: String(data.monthlyAmount),
             details: data.sale.details || "",
-            installationDate: data.sale.installationDate ||
-              (data.sale.installedAt || data.startDate).slice(0, 10),
+            installationDate: getInstallationDate(data.sale, data.startDate),
             installationTimeRange: data.sale.installationTimeRange || "",
           });
         }

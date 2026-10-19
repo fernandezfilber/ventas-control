@@ -39,7 +39,7 @@ El PDF contiene las condiciones solicitadas: permanencia mínima de tres meses, 
 
 ## Excel de clientes
 
-La primera hoja debe incluir `nombres`, `dni`, `telefono` y `direccion`; también acepta `plan`, `mensualidad`, `fecha_instalacion` (AAAA-MM-DD o fecha Excel), `horario`, `detalles` y `servicio_adicional`. Si faltan plan o mensualidad, se usan provisionalmente `Plan básico 250 Mbps` y S/ 50; si falta teléfono se conserva el de la cuenta existente y, si no existe, queda vacío para editarlo después. Si falta la fecha, se usa la fecha actual al importar. Para otra instalación del mismo DNI, usa `servicio_adicional=SI`. Cada fila crea una venta, un contrato y tres recibos; los datos provisionales se pueden corregir en la ficha. Para cuentas existentes sin venta, importa desde la sesión del asesor responsable; no las insertes manualmente en `User`.
+La primera hoja debe incluir `nombres`, `dni`, `telefono` y `direccion`; también acepta `plan`, `mensualidad`, `fecha_instalacion` (AAAA-MM-DD o fecha Excel), `horario`, `detalles` y `servicio_adicional`. Si faltan plan o mensualidad, se usan provisionalmente `Plan básico 250 Mbps` y S/ 50; si falta teléfono se conserva el de la cuenta existente y, si no existe, queda vacío para editarlo después. Si falta la fecha, se usa la fecha calendario de Lima al importar. Para otra instalación del mismo DNI, usa `servicio_adicional=SI`. Cada fila crea una venta, un contrato y tres recibos; los datos provisionales se pueden corregir en la ficha. Para cuentas existentes sin venta, importa desde la sesión del asesor responsable; no las insertes manualmente en `User`.
 
 ## Despliegue en Docker
 
