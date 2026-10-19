@@ -27,8 +27,15 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month');
   const sellerId = searchParams.get('sellerId');
+  const dni = searchParams.get('dni')?.replace(/\D/g, '') ?? '';
 
   const where: Record<string, unknown> = {};
+  if (searchParams.has('dni')) {
+    if (!/^\d{7,12}$/.test(dni)) {
+      return NextResponse.json({ message: 'Ingresa un DNI válido de 7 a 12 dígitos.' }, { status: 400 });
+    }
+    where.dni = dni;
+  }
 
   if (auth.role === 'SELLER') {
     where.sellerUserId = auth.userId;
@@ -174,7 +181,7 @@ export async function POST(req: Request) {
       const contractNumber = `FV-${startedAt.getUTCFullYear()}-${String((lastContract?.id ?? 0) + 1).padStart(4, '0')}`;
       const correlativeId = String((lastSale?.id ?? 0) + 1).padStart(4, '0');
       const receipts = [1, 2, 3].map((month) => {
-        const dueDate = new Date(Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth() + month, 1));
+        const dueDate = new Date(Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth() + month - 1, 1));
         dueDate.setUTCDate(Math.min(
           paymentDay,
           new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),

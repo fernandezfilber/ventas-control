@@ -94,8 +94,11 @@ export async function POST(req: Request) {
         paymentDay,
         receipts: {
           create: [1, 2, 3].map((month) => {
-            const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + month);
+            const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + month - 1, 1));
+            dueDate.setUTCDate(Math.min(
+              paymentDay,
+              new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
+            ));
             return {
               monthNumber: month,
               dueDate,

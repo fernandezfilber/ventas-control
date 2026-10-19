@@ -85,6 +85,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
   const [linking, setLinking] = useState(false);
   const [editingClient, setEditingClient] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
+  const [clientSaveMessage, setClientSaveMessage] = useState("");
   const [clientData, setClientData] = useState({ names: "", dni: "", address: "", phone: "", locationLink: "", internetPlan: "", monthlyAmount: "", details: "", installationDate: "", installationTimeRange: "" });
   const [signing, setSigning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -183,6 +184,21 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       })
       .then((data) => {
         setContract(data);
+        if (data) {
+          setClientData({
+            names: data.sale.names,
+            dni: data.sale.dni,
+            address: data.sale.address,
+            phone: data.sale.phone,
+            locationLink: data.sale.locationLink,
+            internetPlan: data.sale.internetPlan || "",
+            monthlyAmount: String(data.monthlyAmount),
+            details: data.sale.details || "",
+            installationDate: data.sale.installationDate ||
+              (data.sale.installedAt || data.startDate).slice(0, 10),
+            installationTimeRange: data.sale.installationTimeRange || "",
+          });
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -256,6 +272,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     event.preventDefault();
     if (!contract) return;
     setSavingClient(true);
+    setClientSaveMessage("");
     try {
       const res = await fetch(`/api/clients/${contract.sale.id}`, {
         method: "PUT",
@@ -264,13 +281,14 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
       });
       if (!res.ok) {
         const error = (await readJsonResponse<{ message?: string }>(res)) ?? {};
-        alert(error.message || "No se pudieron actualizar los datos del cliente.");
+        setClientSaveMessage(error.message || "No se pudieron actualizar los datos del cliente.");
         return;
       }
       setEditingClient(false);
+      setClientSaveMessage("Cambios guardados correctamente.");
       refreshContract();
-    } catch {
-      alert("Error de conexión.");
+    } catch (error) {
+      setClientSaveMessage(error instanceof Error ? error.message : "Error de conexión al guardar los cambios.");
     } finally {
       setSavingClient(false);
     }
@@ -453,6 +471,11 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
             </div>
             {editingClient ? (
               <form onSubmit={handleSaveClient}>
+                {clientSaveMessage && (
+                  <p role={clientSaveMessage.startsWith("Cambios guardados") ? "status" : "alert"} style={{ marginBottom: 12, color: clientSaveMessage.startsWith("Cambios guardados") ? "var(--fv-green)" : "var(--fv-red)" }}>
+                    {clientSaveMessage}
+                  </p>
+                )}
                 <div className="form-group">
                   <label>Nombre completo</label>
                   <input required value={clientData.names} onChange={(event) => setClientData({ ...clientData, names: event.target.value })} />
@@ -499,6 +522,7 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
               </form>
             ) : (
               <div style={{ fontSize: "0.9rem", color: "var(--text-light)" }}>
+                {clientSaveMessage && <p role="status" style={{ marginBottom: 8, color: "var(--fv-green)" }}>{clientSaveMessage}</p>}
                 <div><strong>Nombre:</strong> {contract.sale.names}</div>
                 <div><strong>DNI:</strong> {contract.sale.dni}</div>
                 {contract.sale.details && <div><strong>Detalles:</strong> {contract.sale.details}</div>}

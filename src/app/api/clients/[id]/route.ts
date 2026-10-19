@@ -136,15 +136,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           data: { startDate, endDate, paymentDay },
         });
         const unpaidReceipts = await tx.receipt.findMany({
-          where: { contractId: existing.contract.id, status: { not: 'PAID' } },
-          select: { id: true, monthNumber: true },
+          where: { contractId: existing.contract.id },
+          select: { id: true, monthNumber: true, status: true },
         });
         for (const receipt of unpaidReceipts) {
-          const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + receipt.monthNumber, 1));
+          const dueDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + receipt.monthNumber - 1, 1));
           dueDate.setUTCDate(Math.min(
             paymentDay,
             new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate(),
           ));
+          if (receipt.status === 'PAID') {
+            await tx.receipt.update({
+              where: { id: receipt.id },
+              data: { dueDate },
+            });
+            continue;
+          }
           const today = new Date();
           today.setUTCHours(0, 0, 0, 0);
           await tx.receipt.update({

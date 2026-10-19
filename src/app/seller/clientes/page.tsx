@@ -114,6 +114,8 @@ export default function SellerClients() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dniInput, setDniInput] = useState("");
+  const [dniSearch, setDniSearch] = useState("");
   const [month, setMonth] = useState("all");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState("");
@@ -121,7 +123,10 @@ export default function SellerClients() {
 
   const loadClients = async () => {
     try {
-      const query = month === "all" ? "" : `?month=${encodeURIComponent(month)}`;
+      const params = new URLSearchParams();
+      if (month !== "all") params.set("month", month);
+      if (dniSearch) params.set("dni", dniSearch);
+      const query = params.size ? `?${params.toString()}` : "";
       const response = await fetch(`/api/clients${query}`);
       const data = await readJsonResponse<ClientRecord[]>(response);
       if (!response.ok) {
@@ -141,7 +146,10 @@ export default function SellerClients() {
 
   useEffect(() => {
     let active = true;
-    const query = month === "all" ? "" : `?month=${encodeURIComponent(month)}`;
+    const params = new URLSearchParams();
+    if (month !== "all") params.set("month", month);
+    if (dniSearch) params.set("dni", dniSearch);
+    const query = params.size ? `?${params.toString()}` : "";
     fetch(`/api/clients${query}`)
       .then(async (response) => {
         const data = await readJsonResponse<ClientRecord[]>(response);
@@ -169,7 +177,19 @@ export default function SellerClients() {
     return () => {
       active = false;
     };
-  }, [month]);
+  }, [month, dniSearch]);
+
+  const applyDniSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const dni = dniInput.replace(/\D/g, "");
+    if (dni && !/^\d{7,12}$/.test(dni)) {
+      setImportResult("Ingresa un DNI válido de 7 a 12 dígitos.");
+      return;
+    }
+    setImportResult("");
+    setLoading(true);
+    setDniSearch(dni);
+  };
 
   const filtered = clients.filter((client) =>
     client.names.toLowerCase().includes(search.toLowerCase()) ||
@@ -291,11 +311,29 @@ export default function SellerClients() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(150px, 1fr) minmax(180px, 240px)", gap: 10, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(150px, 1fr) minmax(150px, 220px) minmax(180px, 240px)", gap: 10, marginBottom: 16 }}>
         <div style={{ position: "relative" }}>
           <FiSearch style={{ position: "absolute", left: 13, top: 14, color: "var(--text-light)" }} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nombre, DNI o contrato" aria-label="Buscar clientes" style={{ width: "100%", padding: "12px 12px 12px 38px", border: "1px solid var(--border-color)", borderRadius: 10 }} />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre o contrato" aria-label="Buscar por nombre o contrato" style={{ width: "100%", padding: "12px 12px 12px 38px", border: "1px solid var(--border-color)", borderRadius: 10 }} />
         </div>
+        <form onSubmit={applyDniSearch} style={{ display: "flex", gap: 6 }}>
+          <input
+            inputMode="numeric"
+            value={dniInput}
+            onChange={(event) => setDniInput(event.target.value.replace(/\D/g, "").slice(0, 12))}
+            placeholder="Buscar por DNI"
+            aria-label="Buscar cliente por DNI exacto"
+            style={{ minWidth: 0, flex: 1, padding: 11, border: "1px solid var(--border-color)", borderRadius: 10 }}
+          />
+          <button type="submit" className="btn-outline" disabled={!/^\d{7,12}$/.test(dniInput)} style={{ whiteSpace: "nowrap", padding: "8px 10px" }}>
+            Buscar DNI
+          </button>
+          {dniSearch && (
+            <button type="button" className="btn-outline" onClick={() => { setDniInput(""); setDniSearch(""); setLoading(true); }} aria-label="Limpiar búsqueda por DNI">
+              ×
+            </button>
+          )}
+        </form>
         <div style={{ display: "flex", gap: 8 }}>
           <input aria-label="Filtrar ventas por mes" type="month" value={month === "all" ? "" : month} onChange={(event) => { setLoading(true); setMonth(event.target.value || currentMonth()); }} style={{ minWidth: 0, flex: 1, padding: 11, border: "1px solid var(--border-color)", borderRadius: 10, background: "#fff" }} />
           <button type="button" className="btn-outline" onClick={() => setMonth("all")} style={{ whiteSpace: "nowrap", padding: "8px 10px" }}>Todos</button>
