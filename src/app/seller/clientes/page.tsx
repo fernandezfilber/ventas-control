@@ -21,9 +21,17 @@ interface ClientRecord {
     contractNumber: string;
     monthlyAmount: number;
     status: string;
-    receipts: { id: number; status: string; dueDate: string }[];
+    receipts: { id: number; monthNumber: number; status: string; dueDate: string }[];
   } | null;
 }
+
+type PaymentStatus = {
+  key: "overdue" | "due-soon" | "current";
+  label: string;
+  dueDate?: string;
+  dueMonth?: number;
+  firstPaidDate?: string;
+};
 
 const currentMonth = () => {
   const date = new Date();
@@ -51,15 +59,24 @@ const formatDueDate = (value: string) => {
   return new Date(year, month - 1, day).toLocaleDateString("es-PE");
 };
 
-const getPaymentStatus = (client: ClientRecord) => {
+const getPaymentStatus = (client: ClientRecord): PaymentStatus => {
   const receipts = client.contract?.receipts ?? [];
   const unpaid = receipts.filter((receipt) => receipt.status !== "PAID");
+  const firstPaidReceipt = receipts.find((receipt) => receipt.monthNumber === 1 && receipt.status === "PAID");
   const today = todayKey();
   const overdue = unpaid
     .filter((receipt) => receipt.status === "OVERDUE" || dateKey(receipt.dueDate) < today)
     .sort((left, right) => dateKey(left.dueDate).localeCompare(dateKey(right.dueDate)))[0];
 
-  if (overdue) return { key: "overdue", label: "Vencido", dueDate: overdue.dueDate };
+  if (overdue) {
+    return {
+      key: "overdue",
+      label: "Vencido",
+      dueDate: overdue.dueDate,
+      dueMonth: overdue.monthNumber,
+      firstPaidDate: firstPaidReceipt?.dueDate,
+    };
+  }
 
   const nextDue = unpaid
     .filter((receipt) => dateKey(receipt.dueDate) >= today)
@@ -67,11 +84,31 @@ const getPaymentStatus = (client: ClientRecord) => {
   if (nextDue) {
     const todayTimestamp = new Date(`${today}T00:00:00Z`).getTime();
     const daysUntilDue = (new Date(`${dateKey(nextDue.dueDate)}T00:00:00Z`).getTime() - todayTimestamp) / 86_400_000;
-    if (daysUntilDue <= 5) return { key: "due-soon", label: "Por vencer", dueDate: nextDue.dueDate };
-    return { key: "current", label: "Al día", dueDate: nextDue.dueDate };
+    const details = {
+      dueDate: nextDue.dueDate,
+      dueMonth: nextDue.monthNumber,
+      firstPaidDate: firstPaidReceipt?.dueDate,
+    };
+    if (daysUntilDue <= 5) return { key: "due-soon", label: "Por vencer", ...details };
+    return { key: "current", label: "Al día", ...details };
   }
 
-  return { key: "current", label: receipts.length > 0 ? "Al día" : "Sin pagos", dueDate: undefined };
+  return {
+    key: "current",
+    label: receipts.length > 0 ? "Al día" : "Sin pagos",
+    dueDate: undefined,
+    firstPaidDate: firstPaidReceipt?.dueDate,
+  };
+};
+
+const getPaymentDateSummary = (paymentStatus: PaymentStatus) => {
+  const firstPaid = paymentStatus.firstPaidDate
+    ? `Mes 1 pagado ${formatDueDate(paymentStatus.firstPaidDate)} · `
+    : "";
+  if (!paymentStatus.dueDate) return `${firstPaid}Sin vencimiento próximo`;
+  const due = paymentStatus.key === "overdue" ? "Vencido desde" : "Vence";
+  const month = paymentStatus.dueMonth ? `Mes ${paymentStatus.dueMonth} · ` : "";
+  return `${firstPaid}${month}${due} ${formatDueDate(paymentStatus.dueDate)}`;
 };
 
 const valueFor = (row: Record<string, unknown>, aliases: string[]) => {
@@ -372,14 +409,10 @@ export default function SellerClients() {
                     <span>{client.phone}</span>
                     <span>{client.internetPlan || "Sin plan"}</span>
                     <span>{client.address}</span>
-                    <span>{paymentStatus.dueDate
-                      ? `${paymentStatus.key === "overdue" ? "Vencido desde" : "Vence"} ${formatDueDate(paymentStatus.dueDate)}`
-                      : "Sin vencimiento próximo"}</span>
+                    <span>{getPaymentDateSummary(paymentStatus)}</span>
                   </div>
                   <div className="clients-mobile-summary">
-                    {paymentStatus.dueDate
-                      ? `${paymentStatus.key === "overdue" ? "Vencido desde" : "Vence"} ${formatDueDate(paymentStatus.dueDate)}`
-                      : client.phone}
+                    {getPaymentDateSummary(paymentStatus)}
                   </div>
                   <div className="client-list-actions">
                     {client.contract && (
