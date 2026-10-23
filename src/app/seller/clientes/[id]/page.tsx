@@ -383,9 +383,13 @@ export default function SellerClientDetail({ params }: { params: Promise<{ id: s
     }
   };
 
-  const downloadContractPdf = () => {
+  const downloadContractPdf = async () => {
     if (!contract) return;
-    downloadServiceContractPdf(contract);
+    try {
+      await downloadServiceContractPdf(contract);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "No se pudo descargar el contrato.");
+    }
   };
 
   const handleLinkUser = async (e: React.ChangeEvent<HTMLSelectElement>) => {

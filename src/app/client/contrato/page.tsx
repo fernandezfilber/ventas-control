@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { FiDownload, FiCheck, FiX } from "react-icons/fi";
 import { downloadServiceContractPdf } from "@/lib/contract-pdf";
 import { readJsonResponse } from "@/lib/http";
@@ -123,9 +124,13 @@ export default function ClientContract() {
     }
   };
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     if (!contract) return;
-    downloadServiceContractPdf(contract);
+    try {
+      await downloadServiceContractPdf(contract);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "No se pudo descargar el contrato.");
+    }
   };
 
   if (loading) return <div style={{ textAlign: "center", padding: "40px" }}><div className="spinner" /></div>;
@@ -141,9 +146,15 @@ export default function ClientContract() {
       </div>
 
       <div className="client-card" style={{ padding: "0", overflow: "hidden" }}>
-        <div style={{ padding: "20px", background: "rgba(0,0,0,.2)", borderBottom: "1px solid rgba(255,255,255,.1)" }}>
-          <div style={{ fontSize: "0.8rem", color: "#94a3b8", textTransform: "uppercase" }}>Contrato N°</div>
-          <div style={{ fontSize: "1.2rem", fontWeight: 700, letterSpacing: "1px" }}>{contract.contractNumber}</div>
+        <div style={{ padding: "18px 20px", background: "rgba(0,0,0,.2)", borderBottom: "1px solid rgba(255,255,255,.1)", display: "flex", alignItems: "center", gap: "14px" }}>
+          <div style={{ width: "76px", height: "76px", flexShrink: 0, display: "grid", placeItems: "center", background: "#fff", borderRadius: "10px", overflow: "hidden" }}>
+            <Image src="/forward-vision-logo.png" alt="Logo de Forward Vision" width={70} height={78} style={{ objectFit: "contain" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: "0.8rem", color: "#94a3b8", textTransform: "uppercase" }}>Contrato N.°</div>
+            <div style={{ fontSize: "1.2rem", fontWeight: 700, letterSpacing: "1px" }}>{contract.contractNumber}</div>
+            <div style={{ marginTop: "6px", color: "#cbd5e1", fontSize: "0.85rem" }}>FORWARD VISION S.A.C. · RUC 206081592</div>
+          </div>
         </div>
         
         <div style={{ padding: "20px" }}>
@@ -158,20 +169,19 @@ export default function ClientContract() {
               <span style={{ fontWeight: 600 }}>S/ {contract.monthlyAmount.toFixed(2)}</span>
             </div>
             <div>
-              <span style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: "4px" }}>Vigencia</span>
-              <span style={{ fontWeight: 600 }}>3 Meses</span>
+              <span style={{ color: "#94a3b8", fontSize: "0.85rem", display: "block", marginBottom: "4px" }}>Permanencia mínima</span>
+              <span style={{ fontWeight: 600 }}>3 meses</span>
             </div>
           </div>
           
           <div style={{ fontSize: "0.85rem", color: "#cbd5e1", lineHeight: 1.6, padding: "12px", background: "rgba(255,255,255,.03)", borderRadius: "8px", marginTop: "20px" }}>
-            <strong>Cancelación anticipada:</strong> cargo informado de S/ 100.00 antes de completar los 3 meses.
+            <strong>Periodo mínimo:</strong> tres meses contados desde la fecha de inicio del servicio.
+            <br />
+            <strong>Cancelación anticipada:</strong> cargo informado de S/ 100.00 antes de completar el periodo mínimo.
             <br />
             <strong>Materiales:</strong> el cliente asume reparaciones comprobables por daños causados por uso indebido o negligencia.
             <br />
             <span style={{ display: "block", marginTop: 8 }}>ForwardVision · +51 955 318 590</span>
-            <span style={{ display: "block", marginTop: 8, color: "#fbbf24" }}>
-              Borrador: falta incorporar RUC, domicilio legal y logo antes de usar como contrato definitivo.
-            </span>
           </div>
         </div>
       </div>
